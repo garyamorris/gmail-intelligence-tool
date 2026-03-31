@@ -108,8 +108,7 @@ def message_api(message_id: str):
     row = store.get_by_id(message_id)
     if not row:
         raise HTTPException(status_code=404, detail="message not found")
-    items = store.list_action_items(limit=100)
-    items = [i for i in items if i["message_id"] == message_id]
+    items = [i for i in store.list_action_items(limit=100) if i["message_id"] == message_id]
     row["action_items"] = items
     row["draft_reply"] = intel.draft_reply(row["subject"], row["sender"], row.get("summary", ""), row.get("intent", "reply_needed"))
     return row
@@ -280,7 +279,7 @@ def auth_callback(code: str):
             add_secret_version("gmail-token-json", token_json)
         except Exception:
             pass
-        return {"ok": True, "message": "Token saved. You can now use /api/sync"}
+        return RedirectResponse(url="/?auth=ok", status_code=302)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"OAuth callback failed: {exc}")
 
