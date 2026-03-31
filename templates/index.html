@@ -19,56 +19,22 @@
         --bad: #fb7185;
       }
       * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background:
-          radial-gradient(circle at top left, rgba(110, 124, 255, 0.16), transparent 28%),
-          radial-gradient(circle at top right, rgba(86, 211, 255, 0.08), transparent 18%),
-          var(--bg);
-        color: var(--text);
-      }
+      body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: radial-gradient(circle at top left, rgba(110, 124, 255, 0.16), transparent 28%), radial-gradient(circle at top right, rgba(86, 211, 255, 0.08), transparent 18%), var(--bg); color: var(--text); }
       .shell { max-width: 1600px; margin: 0 auto; padding: 20px; }
-      .hero {
-        display: flex; justify-content: space-between; align-items: end; gap: 20px;
-        margin-bottom: 16px;
-      }
+      .hero { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 16px; }
       h1 { margin: 0; font-size: 28px; }
       .sub { color: var(--muted); margin-top: 6px; }
       .pill { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: rgba(15,20,38,0.7); color: var(--muted); font-size: 12px; }
       .grid { display: grid; grid-template-columns: 280px 1fr 360px; gap: 14px; align-items: start; }
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 14px;
-        box-shadow: 0 16px 48px rgba(0,0,0,0.22);
-      }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.22); }
       .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 10px; }
       .row { display: flex; gap: 10px; flex-wrap: wrap; }
       .stack { display: grid; gap: 10px; }
-      button {
-        background: linear-gradient(180deg, var(--accent), #4c62ff);
-        color: white; border: 0; border-radius: 12px; padding: 10px 12px; cursor: pointer;
-        font-weight: 600;
-      }
+      button { background: linear-gradient(180deg, var(--accent), #4c62ff); color: white; border: 0; border-radius: 12px; padding: 10px 12px; cursor: pointer; font-weight: 600; }
       button.secondary { background: rgba(24,32,62,0.95); border: 1px solid var(--line); color: var(--text); }
-      button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
-      input {
-        background: rgba(10,15,28,0.9);
-        border: 1px solid var(--line);
-        color: var(--text);
-        padding: 10px 12px;
-        border-radius: 12px;
-        width: 100%;
-      }
+      input { background: rgba(10,15,28,0.9); border: 1px solid var(--line); color: var(--text); padding: 10px 12px; border-radius: 12px; width: 100%; }
       .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
-      .topic, .msg {
-        border: 1px solid rgba(38,50,92,.9);
-        background: var(--panel-2);
-        border-radius: 16px;
-        padding: 12px;
-      }
+      .topic, .msg { border: 1px solid rgba(38,50,92,.9); background: var(--panel-2); border-radius: 16px; padding: 12px; }
       .topic { cursor: pointer; }
       .topic.active { border-color: var(--accent-2); box-shadow: 0 0 0 1px rgba(86,211,255,.2) inset; }
       .topic-head, .msg-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
@@ -86,72 +52,51 @@
       .kpi > div { background: rgba(18,25,48,.95); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
       .kpi .num { font-size: 22px; font-weight: 800; }
       .kpi .label { font-size: 12px; color: var(--muted); }
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .list { display: grid; gap: 8px; }
-      .detail-section { margin-top: 12px; }
       .spacer { height: 8px; }
-      @media (max-width: 1200px) {
-        .grid { grid-template-columns: 1fr; }
-        .details { position: static; }
-      }
+      @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } .details { position: static; } }
     </style>
     <script>
-      const state = { messages: [], topics: [], currentTopic: null };
+      const state = { messages: [], topics: [], currentTopic: null, lane: null };
 
       async function api(path, options={}) {
-        const res = await fetch(path, {
-          headers: { 'Content-Type': 'application/json' },
-          ...options
-        });
+        const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
         if (!res.ok) throw new Error(await res.text());
         return await res.json();
       }
 
-      function escapeHtml(str) {
-        return (str || '')
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;')
-          .replaceAll('"', '&quot;')
-          .replaceAll("'", '&#039;');
-      }
+      function escapeHtml(str) { return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'); }
+      function badgeClass(score) { if (score >= 4) return 'badge bad'; if (score >= 2) return 'badge warn'; return 'badge good'; }
 
-      function badgeClass(score) {
-        if (score >= 4) return 'badge bad';
-        if (score >= 2) return 'badge warn';
-        return 'badge good';
+      async function openLane(name) {
+        state.lane = name;
+        state.currentTopic = null;
+        const rows = await api(`/api/lane/${name}?limit=200`);
+        state.messages = rows;
+        state.topics = [];
+        renderTopics();
+        renderMessages();
       }
 
       function renderTopics() {
-        const el = document.getElementById('topics');
-        el.innerHTML = '';
-        state.topics.forEach(t => {
+        const el = document.getElementById('topics'); el.innerHTML = '';
+        const lanes = [
+          { cluster_label: 'Waiting on others', message_count: state.messages.filter(m => ['follow_up', 'acknowledgement'].includes(m.intent) || ['set_follow_up', 'quiet'].includes(m.suggested_action)).length },
+          { cluster_label: 'Needs decision', message_count: state.messages.filter(m => ['approval', 'finance'].includes(m.intent) || (m.actionability_score || 0) >= 3).length },
+          { cluster_label: 'Noise', message_count: state.messages.filter(m => (m.noise_score || 0) >= 2 || ['archive', 'quiet'].includes(m.suggested_action)).length },
+          { cluster_label: 'Reply now', message_count: state.messages.filter(m => ['reply', 'draft_schedule_reply', 'review_and_route'].includes(m.suggested_action)).length },
+        ];
+        lanes.forEach(t => {
           const node = document.createElement('div');
-          node.className = 'topic' + (state.currentTopic === t.cluster_label ? ' active' : '');
-          node.onclick = () => {
-            state.currentTopic = t.cluster_label;
-            renderTopics();
-            renderMessages();
-          };
-          node.innerHTML = `
-            <div class="topic-head">
-              <div>
-                <div class="title">${escapeHtml(t.cluster_label || 'Uncategorized')}</div>
-                <div class="meta">${t.message_count || 0} messages · ${t.active_count || 0} active</div>
-              </div>
-              <span class="badge">${escapeHtml(t.latest_date || '')}</span>
-            </div>
-            <div class="spacer"></div>
-            <div class="small">Priority: ${Number(t.total_actionability || 0)} · Noise: ${Number(t.total_noise || 0)}</div>
-          `;
+          node.className = 'topic';
+          node.onclick = async () => { state.currentTopic = t.cluster_label; renderTopics(); renderMessages(); };
+          node.innerHTML = `<div class="topic-head"><div><div class="title">${escapeHtml(t.cluster_label)}</div><div class="meta">${t.message_count || 0} messages</div></div><span class="badge">lane</span></div>`;
           el.appendChild(node);
         });
       }
 
       function renderMessages() {
-        const rows = state.currentTopic ? state.messages.filter(m => m.cluster_label === state.currentTopic) : state.messages;
-        const container = document.getElementById('messages');
-        container.innerHTML = '';
+        const rows = state.currentTopic && state.topics.length ? state.messages.filter(m => m.cluster_label === state.currentTopic) : state.messages;
+        const container = document.getElementById('messages'); container.innerHTML = '';
         rows.forEach(m => {
           const el = document.createElement('div');
           el.className='msg';
@@ -177,8 +122,9 @@
             </div>
             <div class="spacer"></div>
             <div class="toolbar">
-              <button class="secondary" onclick="analyzeMessage('${m.id}')">Analyze</button>
               <button class="secondary" onclick="openDetail('${m.id}')">Detail</button>
+              <button class="secondary" onclick="draftReply('${m.id}')">Draft reply</button>
+              <button class="secondary" onclick="analyzeMessage('${m.id}')">Analyze</button>
               <button onclick="archiveSelected(['${m.id}'])">Archive</button>
             </div>
             <div id="analysis-${m.id}" class="small"></div>
@@ -189,25 +135,22 @@
 
       function renderBriefing(payload) {
         const box = document.getElementById('briefing');
-        const top = payload.top_messages || [];
-        const actions = payload.action_items || [];
+        const top = payload.top_messages || []; const actions = payload.action_items || [];
         box.innerHTML = `
           <div class="kpi">
             <div><div class="num">${top.length}</div><div class="label">top messages</div></div>
             <div><div class="num">${actions.length}</div><div class="label">action items</div></div>
-            <div><div class="num">${state.topics.length}</div><div class="label">topics</div></div>
+            <div><div class="num">${state.messages.length}</div><div class="label">loaded</div></div>
           </div>
-          <div class="detail-section">
-            <div class="section-title">Briefing</div>
-            <div class="list">
-              ${top.slice(0, 5).map(m => `<div class="small"><strong>${escapeHtml(m.subject || '(no subject)')}</strong><br/>${escapeHtml(m.sender)} · ${escapeHtml(m.cluster_label || '')} · ${escapeHtml(m.suggested_action || '')}</div>`).join('') || '<div class="small">No messages yet.</div>'}
-            </div>
+          <div class="spacer"></div>
+          <div class="section-title">Briefing</div>
+          <div class="stack">
+            ${top.slice(0, 5).map(m => `<div class="small"><strong>${escapeHtml(m.subject || '(no subject)')}</strong><br/>${escapeHtml(m.sender)} · ${escapeHtml(m.cluster_label || '')} · ${escapeHtml(m.suggested_action || '')}</div>`).join('') || '<div class="small">No messages yet.</div>'}
           </div>
-          <div class="detail-section">
-            <div class="section-title">Action items</div>
-            <div class="list">
-              ${actions.slice(0, 6).map(a => `<div class="small">• ${escapeHtml(a.item)}<br/><span class="muted">${escapeHtml(a.subject || '')}</span></div>`).join('') || '<div class="small">No action items yet.</div>'}
-            </div>
+          <div class="spacer"></div>
+          <div class="section-title">Action items</div>
+          <div class="stack">
+            ${actions.slice(0, 6).map(a => `<div class="small">• ${escapeHtml(a.item)}<br/><span class="muted">${escapeHtml(a.subject || '')}</span></div>`).join('') || '<div class="small">No action items yet.</div>'}
           </div>
         `;
       }
@@ -218,11 +161,8 @@
           api('/api/topics?include_archived=false&limit=50'),
           api('/api/briefing?limit=10')
         ]);
-        state.messages = messages;
-        state.topics = topics;
-        renderTopics();
-        renderMessages();
-        renderBriefing(briefing);
+        state.messages = messages; state.topics = topics; state.currentTopic = null; state.lane = null;
+        renderTopics(); renderMessages(); renderBriefing(briefing);
       }
 
       async function syncNow() {
@@ -235,76 +175,70 @@
       async function searchNow() {
         const q = document.getElementById('search').value;
         const rows = await api('/api/search?' + new URLSearchParams({ q, k: '20' }));
-        state.messages = rows;
-        state.currentTopic = null;
-        renderTopics();
-        renderMessages();
+        state.messages = rows; state.currentTopic = null; state.topics = [];
+        renderTopics(); renderMessages();
       }
 
-      function selectedIds() {
-        return [...document.querySelectorAll('input[type=checkbox][data-id]:checked')].map(el => el.dataset.id);
-      }
+      function selectedIds() { return [...document.querySelectorAll('input[type=checkbox][data-id]:checked')].map(el => el.dataset.id); }
 
       async function archiveSelected(idsOverride = null) {
-        const ids = idsOverride || selectedIds();
-        if (!ids.length) return;
+        const ids = idsOverride || selectedIds(); if (!ids.length) return;
         await api('/api/archive', { method: 'POST', body: JSON.stringify({ message_ids: ids }) });
         document.getElementById('status').innerText = `Archived ${ids.length} messages`;
         await loadAll();
       }
 
       async function archiveByQuery() {
-        const q = document.getElementById('bulkQuery').value;
-        const limit = document.getElementById('bulkLimit').value || '30';
-        const res = await api('/api/bulk_archive_by_query', {
-          method: 'POST',
-          body: JSON.stringify({ query: q, limit: Number(limit) })
-        });
+        const q = document.getElementById('bulkQuery').value; const limit = document.getElementById('bulkLimit').value || '30';
+        const res = await api('/api/bulk_archive_by_query', { method: 'POST', body: JSON.stringify({ query: q, limit: Number(limit) }) });
         document.getElementById('status').innerText = `Archived ${res.archived} messages by query`;
         await loadAll();
       }
 
       async function analyzeMessage(id) {
         const res = await api('/api/analyze', { method: 'POST', body: JSON.stringify({ message_id: id }) });
-        const el = document.getElementById(`analysis-${id}`);
-        el.innerText = `intent=${res.intent} · action=${res.suggested_action} · noise=${res.noise_score}`;
+        document.getElementById(`analysis-${id}`).innerText = `intent=${res.intent} · action=${res.suggested_action} · noise=${res.noise_score}`;
       }
 
       async function openDetail(id) {
-        const res = await api('/api/analyze', { method: 'POST', body: JSON.stringify({ message_id: id }) });
+        const res = await api(`/api/message/${id}`);
         const box = document.getElementById('detail');
         box.innerHTML = `
           <div class="section-title">Decision detail</div>
           <div class="title">${escapeHtml(res.subject || '(no subject)')}</div>
           <div class="meta">${escapeHtml(res.sender || '')}</div>
           <div class="spacer"></div>
-          <div class="list">
-            <div class="small"><strong>Summary:</strong> ${escapeHtml(res.summary || '')}</div>
-            <div class="small"><strong>Intent:</strong> ${escapeHtml(res.intent || '')}</div>
-            <div class="small"><strong>Cluster:</strong> ${escapeHtml(res.cluster_label || '')}</div>
-            <div class="small"><strong>Action:</strong> ${escapeHtml(res.suggested_action || '')}</div>
-            <div class="small"><strong>Actionability:</strong> ${escapeHtml(String(res.actionability_score ?? ''))}</div>
-            <div class="small"><strong>Noise:</strong> ${escapeHtml(String(res.noise_score ?? ''))}</div>
-            <div class="small"><strong>Reasons:</strong> ${escapeHtml((res.reason_codes || []).join(', '))}</div>
-          </div>
+          <div class="small"><strong>Summary:</strong> ${escapeHtml(res.summary || '')}</div>
+          <div class="small"><strong>Intent:</strong> ${escapeHtml(res.intent || '')}</div>
+          <div class="small"><strong>Cluster:</strong> ${escapeHtml(res.cluster_label || '')}</div>
+          <div class="small"><strong>Action:</strong> ${escapeHtml(res.suggested_action || '')}</div>
+          <div class="small"><strong>Actionability:</strong> ${escapeHtml(String(res.actionability_score ?? ''))}</div>
+          <div class="small"><strong>Noise:</strong> ${escapeHtml(String(res.noise_score ?? ''))}</div>
+          <div class="small"><strong>Reasons:</strong> ${escapeHtml((res.reason_codes || []).join(', '))}</div>
+          <div class="spacer"></div>
+          <div class="section-title">Draft reply</div>
+          <div class="small" style="white-space: pre-wrap">${escapeHtml(res.draft_reply || '')}</div>
+          <div class="spacer"></div>
+          <div class="section-title">Action items</div>
+          <div class="stack">${(res.action_items || []).map(a => `<div class="small">• ${escapeHtml(a.item)}</div>`).join('') || '<div class="small">None</div>'}</div>
         `;
       }
 
+      async function draftReply(id) {
+        const tone = prompt('Tone? concise / warm / firm / boundary', 'concise') || 'concise';
+        const res = await api('/api/draft_reply', { method: 'POST', body: JSON.stringify({ message_id: id, tone }) });
+        const box = document.getElementById('detail');
+        box.innerHTML = `<div class="section-title">Draft reply</div><div class="small" style="white-space: pre-wrap">${escapeHtml(res.draft)}</div>`;
+      }
+
       async function handoff(idsOverride = null) {
-        const ids = idsOverride || selectedIds();
-        const instruction = prompt('What should the agent do with these messages?', 'Summarize and propose actions');
+        const ids = idsOverride || selectedIds(); const instruction = prompt('What should the agent do with these messages?', 'Summarize and propose actions');
         if (!ids.length || !instruction) return;
-        await api('/api/agent/handoff', {
-          method: 'POST',
-          body: JSON.stringify({ message_ids: ids, instruction })
-        });
+        await api('/api/agent/handoff', { method: 'POST', body: JSON.stringify({ message_ids: ids, instruction }) });
         document.getElementById('status').innerText = `Handed off ${ids.length} messages to configured agent webhook`;
       }
 
-      async function login() {
-        const r = await api('/auth/login');
-        if (r.auth_url) window.location = r.auth_url;
-      }
+      async function login() { const r = await api('/auth/login'); if (r.auth_url) window.location = r.auth_url; }
 
       loadAll();
     </script>
@@ -312,10 +246,7 @@
   <body>
     <div class="shell">
       <div class="hero">
-        <div>
-          <h1>Gmail Intelligence Tool</h1>
-          <div class="sub">Decision-first inbox · semantic grouping · action extraction</div>
-        </div>
+        <div><h1>Gmail Intelligence Tool</h1><div class="sub">Decision-first inbox · semantic grouping · action extraction</div></div>
         <div id="status" class="pill">Ready</div>
       </div>
 
@@ -324,46 +255,26 @@
           <button onclick="login()">Authenticate Gmail</button>
           <button class="secondary" onclick="loadAll()">Refresh dashboard</button>
           <button class="secondary" onclick="syncNow()">Sync Gmail</button>
-          <label class="pill"><input type="checkbox" id="archived" /> Include archived</label>
-          <input id="q" placeholder="Local filter" style="max-width:240px" />
+          <button class="secondary" onclick="openLane('waiting')">Waiting on others</button>
+          <button class="secondary" onclick="openLane('decision')">Needs decision</button>
+          <button class="secondary" onclick="openLane('reply')">Reply now</button>
+          <button class="secondary" onclick="openLane('noise')">Noise</button>
           <input id="max" type="number" value="40" min="1" style="max-width:110px" />
         </div>
       </div>
 
       <div class="grid">
+        <div class="stack"><div class="card"><div class="section-title">Topics</div><div id="topics" class="stack"></div></div></div>
         <div class="stack">
           <div class="card">
-            <div class="section-title">Topics</div>
-            <div id="topics" class="stack"></div>
-          </div>
-        </div>
-
-        <div class="stack">
-          <div class="card">
-            <div class="row">
-              <input id="search" placeholder="Semantic search" />
-              <button class="secondary" onclick="searchNow()">Search</button>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <input id="bulkQuery" value="in:inbox newer_than:30d" />
-              <input id="bulkLimit" type="number" value="30" min="1" style="max-width:110px" />
-              <button onclick="archiveByQuery()">Archive by Query</button>
-              <button class="secondary" onclick="archiveSelected()">Archive selected</button>
-            </div>
+            <div class="row"><input id="search" placeholder="Semantic search" /><button class="secondary" onclick="searchNow()">Search</button></div>
+            <div class="row" style="margin-top:10px"><input id="bulkQuery" value="in:inbox newer_than:30d" /><input id="bulkLimit" type="number" value="30" min="1" style="max-width:110px" /><button onclick="archiveByQuery()">Archive by Query</button><button class="secondary" onclick="archiveSelected()">Archive selected</button></div>
           </div>
           <div class="messages" id="messages"></div>
         </div>
-
         <div class="details">
-          <div class="card">
-            <div id="briefing"></div>
-          </div>
-          <div class="card" style="margin-top:14px">
-            <div id="detail" class="detail-box">
-              <div class="section-title">Decision detail</div>
-              <div class="small">Select a message to inspect its summary, intent, suggested action, and reasons.</div>
-            </div>
-          </div>
+          <div class="card"><div id="briefing"></div></div>
+          <div class="card" style="margin-top:14px"><div id="detail" class="detail-box"><div class="section-title">Decision detail</div><div class="small">Select a message to inspect summary, intent, suggested action, and draft reply.</div></div></div>
         </div>
       </div>
     </div>

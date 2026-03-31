@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
-from typing import Iterable
 
 
 ACTION_WORDS = [
@@ -163,3 +162,25 @@ class IntelligenceEngine:
         if any(w in lower for w in ["deadline", "due", "by friday", "tomorrow"]):
             items.append("Identify deadline and owner")
         return items
+
+    def draft_reply(self, subject: str, sender: str, summary: str, intent: str, tone: str = "concise") -> str:
+        if intent == "schedule":
+            body = "Thanks — I can take a look. Send over a couple of times that work for you and I’ll confirm."
+        elif intent == "finance":
+            body = "Thanks. I’m reviewing this now and will route it appropriately if anything needs action."
+        elif intent == "approval":
+            body = "Thanks — I’m reviewing this and will confirm once I’ve checked the details."
+        elif intent == "follow_up":
+            body = "Understood — I’ll keep this on my radar and follow up if needed."
+        elif intent == "acknowledgement":
+            body = "Received, thanks."
+        else:
+            body = "Thanks — I’ve seen this and will get back to you shortly."
+
+        if tone == "warm":
+            body = body.replace("Thanks", "Thanks so much")
+        elif tone == "firm":
+            body = body.replace("I’ll get back to you shortly", "I’ll respond once I’ve reviewed the details")
+        elif tone == "boundary":
+            body = body.replace("I’ll get back to you shortly", "I’ll reply when I’m able")
+        return body + f"\n\n—\nContext: {summary[:220]}"

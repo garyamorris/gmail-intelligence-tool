@@ -86,6 +86,35 @@ def briefing_api(limit: int = 10):
     }
 
 
+@app.get("/api/lane/{lane}")
+def lane_api(lane: str, limit: int = 50):
+    lane = lane.lower().strip()
+    rows = store.list_messages(include_archived=False, limit=500)
+    if lane == "waiting":
+        rows = [r for r in rows if r.get("intent") in {"follow_up", "acknowledgement"} or r.get("suggested_action") in {"set_follow_up", "quiet"}]
+    elif lane == "decision":
+        rows = [r for r in rows if r.get("intent") in {"approval", "finance"} or r.get("actionability_score", 0) >= 3]
+    elif lane == "noise":
+        rows = [r for r in rows if r.get("noise_score", 0) >= 2 or r.get("suggested_action") in {"archive", "quiet"}]
+    elif lane == "reply":
+        rows = [r for r in rows if r.get("suggested_action") in {"reply", "draft_schedule_reply", "review_and_route"}]
+    else:
+        raise HTTPException(status_code=400, detail="Unknown lane")
+    return rows[:limit]
+
+
+@app.get("/api/message/{message_id}")
+def message_api(message_id: str):
+    row = store.get_by_id(message_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="message not found")
+    items = store.list_action_items(limit=100)
+    items = [i for i in items if i["message_id"] == message_id]
+    row["action_items"] = items
+    row["draft_reply"] = intel.draft_reply(row["subject"], row["sender"], row.get("summary", ""), row.get("intent", "reply_needed"))
+    return row
+
+
 @app.get("/api/search")
 def search_api(q: str, k: int = 20):
     if not q:
@@ -172,12 +201,21 @@ def bulk_archive_by_query(payload: dict):
     return {"archived": archived, "message_ids": ids}
 
 
+@app.post("/api/draft_reply")
+def draft_reply_api(payload: dict):
+    message_id = payload.get("message_id")
+    tone = payload.get("tone", "concise")
+    if not message_id:
+        raise HTTPException(status_code=400, detail="message_id required")
+    row = store.get_by_id(message_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="message not found")
+    draft = intel.draft_reply(row["subject"], row["sender"], row.get("summary", ""), row.get("intent", "reply_needed"), tone=tone)
+    return {"message_id": message_id, "draft": draft}
+
+
 @app.post("/api/analyze")
 def analyze_api(payload: dict):
-    """Very lightweight actionability signal (heuristic).
-
-    For stricter triage, call an agent webhook with /api/agent/handoff.
-    """
     message_id = payload.get("message_id")
     if not message_id:
         raise HTTPException(status_code=400, detail="message_id required")
@@ -186,23 +224,7 @@ def analyze_api(payload: dict):
     if not row:
         raise HTTPException(status_code=404, detail="message not found")
 
-    body = (row["snippet"] + "\n" + row["body"]).lower()
-    action_words = ["action", "required", "needed", "please", "reply", "urgent", "approve", "sign", "confirm", "invoice", "meeting"]
-    score = sum(1 for w in action_words if w in body)
-
-    return {
-        "message_id": message_id,
-        "subject": row["subject"],
-        "sender": row["sender"],
-        "summary": row.get("summary"),
-        "intent": row.get("intent"),
-        "cluster_label": row.get("cluster_label"),
-        "suggested_action": row.get("suggested_action"),
-        "suggested_actionable": score > 1,
-        "actionability_score": row.get("actionability_score", score),
-        "noise_score": row.get("noise_score", 0),
-        "reason_codes": row.get("reason_codes", []),
-    }
+    return row
 
 
 @app.get("/auth/login")
