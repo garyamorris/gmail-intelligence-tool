@@ -29,7 +29,7 @@ class MessageRecord:
     reason_codes: List[str] = field(default_factory=list)
     is_archived: bool = False
     created_at: str = ""
-    embedding: Optional[np.ndarray] = None
+    embedding: Optional[object] = None
 
 
 class MessageStore:
@@ -80,6 +80,12 @@ class MessageStore:
             """
         )
         self.conn.commit()
+
+    def _embedding_bytes(self, embedding):
+        if embedding is None:
+            return None
+        arr = np.asarray(embedding, dtype=np.float32)
+        return arr.tobytes()
 
     def upsert_message(self, rec: MessageRecord):
         self.conn.execute(
@@ -153,7 +159,7 @@ class MessageStore:
                     json.dumps(rec.reason_codes or []),
                     1 if rec.is_archived else 0,
                     rec.created_at or datetime.utcnow().isoformat(),
-                    rec.embedding.astype(np.float32).tobytes() if rec.embedding is not None else None,
+                    self._embedding_bytes(rec.embedding),
                 ),
             )
         self.conn.commit()
@@ -288,7 +294,7 @@ class MessageStore:
             "reason_codes": json.dumps(rec.reason_codes or []),
             "is_archived": 1 if rec.is_archived else 0,
             "created_at": rec.created_at or datetime.utcnow().isoformat(),
-            "embedding": rec.embedding.astype(np.float32).tobytes() if rec.embedding is not None else None,
+            "embedding": self._embedding_bytes(rec.embedding),
         }
 
     def _row_to_dict(self, row):
