@@ -222,9 +222,12 @@ def auth_start():
 def auth_callback(code: str):
     if not code:
         raise HTTPException(status_code=400, detail="Missing code")
-    creds = exchange_auth_code(config.client_secrets_file, config.redirect_uri, code)
-    Path(config.token_path).write_text(creds.to_json(), encoding="utf-8")
-    return {"ok": True, "message": "Token saved. You can now use /api/sync"}
+    try:
+        creds = exchange_auth_code(config.client_secrets_file, config.redirect_uri, code)
+        Path(config.token_path).write_text(creds.to_json(), encoding="utf-8")
+        return {"ok": True, "message": "Token saved. You can now use /api/sync"}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"OAuth callback failed: {exc}")
 
 
 @app.post("/api/agent/handoff")

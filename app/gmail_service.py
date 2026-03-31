@@ -7,13 +7,20 @@ from datetime import datetime
 from email.header import decode_header
 from typing import Any, Dict
 
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "openid",
+]
 
 
 def _decode_base64(data: str | None) -> str:
@@ -58,7 +65,6 @@ def get_google_auth_url(client_secrets_file: str, redirect_uri: str) -> str:
     flow = Flow.from_client_secrets_file(client_secrets_file, scopes=SCOPES, redirect_uri=redirect_uri)
     url, _ = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
         prompt="consent",
     )
     return url
