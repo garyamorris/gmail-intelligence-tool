@@ -8,7 +8,7 @@ import numpy as np
 
 
 class EmbeddingService:
-    def __init__(self, model: str = "models/embedding-001"):
+    def __init__(self, model: str = "models/text-embedding-004"):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is required for embeddings")

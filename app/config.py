@@ -19,7 +19,7 @@ class Config:
     allowed_emails: list[str] = field(default_factory=list)
 
     # Embeddings
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "models/embedding-001")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "models/text-embedding-004")
 
     # Agent/webhook integrations
     agent_webhook: str = os.getenv("AGENT_WEBHOOK_URL", "")

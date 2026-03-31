@@ -19,7 +19,7 @@ steps:
       - '--region=$_REGION'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--set-env-vars=GMAIL_USER_EMAIL=$_GMAIL_USER_EMAIL,EMBEDDING_MODEL=models/embedding-001'
+      - '--set-env-vars=GMAIL_USER_EMAIL=$_GMAIL_USER_EMAIL,EMBEDDING_MODEL=models/text-embedding-004'
 
 images:
   - '$_IMAGE_NAME'

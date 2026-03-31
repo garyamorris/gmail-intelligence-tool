@@ -57,7 +57,7 @@ Open: <http://localhost:8080>.
 - `GMAIL_TOKEN_JSON` (optional alternative: provide serialized token JSON directly)
 - `GMAIL_USER_EMAIL` (default: optional, set to `gary.a.morris@gmail.com`)
 - `GEMINI_API_KEY` (required for embeddings)
-- `EMBEDDING_MODEL` (default: `models/embedding-001`)
+- `EMBEDDING_MODEL` (default: `models/text-embedding-004`)
 - `AGENT_WEBHOOK_URL` (optional, for agent handoff)
 - `REDIRECT_URI` (default: `http://localhost:8080/auth/callback`)
 - `DB_PATH` (default: `/app/data/messages.db`)
