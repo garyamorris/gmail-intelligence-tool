@@ -78,6 +78,24 @@ Open: <http://localhost:8080>.
 
 ## Deployment (Google Cloud)
 
+### 0) Add required Gmail OAuth secrets in Secret Manager
+
+Create/update these two secrets in Google Secret Manager for project `cognerys-site`:
+
+- `gmail-client-secrets-json` (Google OAuth client config JSON)
+- `gmail-token-json` (optional initial token JSON)
+
+```bash
+# placeholder creation done for you; replace with real values:
+gcloud secrets versions add gmail-client-secrets-json --project=cognerys-site --data-file=path/to/client_secret.json
+gcloud secrets versions add gmail-token-json --project=cognerys-site --data-file=path/to/token.json
+
+# rebind latest secret values if needed
+gcloud run services update gmail-intelligence-tool \
+  --project=cognerys-site --region=europe-west1 \
+  --set-secrets=GMAIL_CLIENT_SECRETS_JSON=gmail-client-secrets-json:latest,GMAIL_TOKEN_JSON=gmail-token-json:latest
+```
+
 ### 1) Build image locally and push via Cloud Build
 
 ```bash
