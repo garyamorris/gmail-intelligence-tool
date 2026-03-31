@@ -11,7 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY templates ./app/templates
 COPY static ./static
-COPY README.md ./README.md
 
 ENV PORT=8080
 

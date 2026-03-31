@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
 from typing import List
@@ -15,7 +15,7 @@ class Config:
     token_path: Path = Path(os.getenv("GMAIL_TOKEN_PATH", str(project_root / "credentials" / "token.json")))
     user_email: str = os.getenv("GMAIL_USER_EMAIL", "")
     redirect_uri: str = os.getenv("GMAIL_REDIRECT_URI", "http://localhost:8080/auth/callback")
-    allowed_emails: List[str] = os.getenv("ALLOWED_USER_EMAILS", "").split(",") if os.getenv("ALLOWED_USER_EMAILS") else []
+    allowed_emails: list[str] = field(default_factory=list)
 
     # Embeddings
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "models/embedding-001")
@@ -30,6 +30,8 @@ class Config:
     @classmethod
     def validate(cls) -> "Config":
         cfg = cls()
+        raw_emails = os.getenv("ALLOWED_USER_EMAILS", "")
+        cfg.allowed_emails = [email.strip() for email in raw_emails.split(",") if email.strip()]
         if cfg.token_path:
             cfg.token_path.parent.mkdir(parents=True, exist_ok=True)
         return cfg
