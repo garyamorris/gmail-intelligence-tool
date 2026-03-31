@@ -40,6 +40,46 @@ def _get_embedder() -> EmbeddingService:
     return embedder
 
 
+def _sync_messages(max_results: int = 40, query: str = "in:inbox") -> int:
+    svc = build_gmail_service(str(config.token_path), config.client_secrets_file)
+    msg_refs = list_messages(svc, query=query, max_results=max_results)
+
+    embed = _get_embedder()
+    records: List[MessageRecord] = []
+
+    for ref in msg_refs:
+        msg = fetch_full_message(svc, ref["id"])
+        analysis = intel.analyze(msg["subject"], msg["sender"], msg["snippet"], msg["body"])
+        text_for_embedding = f"Subject: {msg['subject']}\nFrom: {msg['sender']}\n\n{msg['snippet']}\n{msg['body']}"
+        vector = embed.embed([text_for_embedding])[0]
+        records.append(
+            MessageRecord(
+                id=msg["id"],
+                thread_id=msg["thread_id"],
+                subject=msg["subject"],
+                sender=msg["sender"],
+                date=msg["date"],
+                snippet=msg["snippet"],
+                body=msg["body"],
+                summary=analysis.summary,
+                labels=msg["labels"],
+                intent=analysis.intent,
+                suggested_action=analysis.suggested_action,
+                cluster_label=analysis.cluster_label,
+                actionability_score=analysis.actionability_score,
+                noise_score=analysis.noise_score,
+                reason_codes=analysis.reason_codes,
+                embedding=vector,
+            )
+        )
+        for item in intel.action_items(msg["subject"], msg["body"]):
+            store.add_action_items(msg["id"], [item])
+
+    if records:
+        store.bulk_upsert(records)
+    return len(records)
+
+
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 
 
@@ -129,45 +169,8 @@ def search_api(q: str, k: int = 20):
 def sync_api(payload: dict):
     max_results = int(payload.get("max_results", 40))
     query = payload.get("query", "in:inbox")
-
-    svc = build_gmail_service(str(config.token_path), config.client_secrets_file)
-    msg_refs = list_messages(svc, query=query, max_results=max_results)
-
-    embed = _get_embedder()
-    records: List[MessageRecord] = []
-
-    for ref in msg_refs:
-        msg = fetch_full_message(svc, ref["id"])
-        analysis = intel.analyze(msg["subject"], msg["sender"], msg["snippet"], msg["body"])
-        text_for_embedding = f"Subject: {msg['subject']}\nFrom: {msg['sender']}\n\n{msg['snippet']}\n{msg['body']}"
-        vector = embed.embed([text_for_embedding])[0]
-        records.append(
-            MessageRecord(
-                id=msg["id"],
-                thread_id=msg["thread_id"],
-                subject=msg["subject"],
-                sender=msg["sender"],
-                date=msg["date"],
-                snippet=msg["snippet"],
-                body=msg["body"],
-                summary=analysis.summary,
-                labels=msg["labels"],
-                intent=analysis.intent,
-                suggested_action=analysis.suggested_action,
-                cluster_label=analysis.cluster_label,
-                actionability_score=analysis.actionability_score,
-                noise_score=analysis.noise_score,
-                reason_codes=analysis.reason_codes,
-                embedding=vector,
-            )
-        )
-        for item in intel.action_items(msg["subject"], msg["body"]):
-            store.add_action_items(msg["id"], [item])
-
-    if records:
-        store.bulk_upsert(records)
-
-    return {"synced": len(records)}
+    synced = _sync_messages(max_results=max_results, query=query)
+    return {"synced": synced}
 
 
 @app.post("/api/archive")
@@ -279,7 +282,11 @@ def auth_callback(code: str):
             add_secret_version("gmail-token-json", token_json)
         except Exception:
             pass
-        return RedirectResponse(url="/?auth=ok", status_code=302)
+        try:
+            _sync_messages(max_results=25, query="in:inbox")
+        except Exception:
+            pass
+        return RedirectResponse(url="/?auth=ok&synced=1", status_code=302)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"OAuth callback failed: {exc}")
 
