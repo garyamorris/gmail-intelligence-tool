@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import json
+import traceback
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -23,8 +24,8 @@ from app.gmail_service import (
     list_messages,
 )
 from app.intelligence import IntelligenceEngine
+from app.secrets_store import add_secret_version, get_secret_version
 from app.storage import MessageRecord, MessageStore
-from app.secrets_store import add_secret_version
 
 
 config = Config.validate()
@@ -40,7 +41,19 @@ def _get_embedder() -> EmbeddingService:
     return embedder
 
 
+def _bootstrap_token_file() -> None:
+    if config.token_path.exists() and config.token_path.stat().st_size > 0:
+        return
+    try:
+        token_json = get_secret_version(config.gmail_token_secret)
+        if token_json:
+            config.token_path.write_text(token_json, encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _sync_messages(max_results: int = 40, query: str = "in:inbox") -> int:
+    _bootstrap_token_file()
     svc = build_gmail_service(str(config.token_path), config.client_secrets_file)
     msg_refs = list_messages(svc, query=query, max_results=max_results)
 
@@ -167,10 +180,16 @@ def search_api(q: str, k: int = 20):
 
 @app.post("/api/sync")
 def sync_api(payload: dict):
-    max_results = int(payload.get("max_results", 40))
-    query = payload.get("query", "in:inbox")
-    synced = _sync_messages(max_results=max_results, query=query)
-    return {"synced": synced}
+    try:
+        max_results = int(payload.get("max_results", 40))
+        query = payload.get("query", "in:inbox")
+        synced = _sync_messages(max_results=max_results, query=query)
+        return {"synced": synced}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(exc), "trace": traceback.format_exc(limit=6)},
+        )
 
 
 @app.post("/api/archive")
