@@ -57,7 +57,7 @@ Open: <http://localhost:8080>.
 - `GMAIL_TOKEN_JSON` (optional alternative: provide serialized token JSON directly)
 - `GMAIL_USER_EMAIL` (default: optional, set to `gary.a.morris@gmail.com`)
 - `GEMINI_API_KEY` (required for embeddings)
-- `GEMINI_MODEL` (default: `models/embedding-001`)
+- `EMBEDDING_MODEL` (default: `models/embedding-001`)
 - `AGENT_WEBHOOK_URL` (optional, for agent handoff)
 - `REDIRECT_URI` (default: `http://localhost:8080/auth/callback`)
 - `DB_PATH` (default: `/app/data/messages.db`)
@@ -125,3 +125,7 @@ git push -u origin main
 ```
 
 Then wire Cloud Build trigger to repo + branch.
+## Live service
+
+URL: https://gmail-intelligence-tool-3pzvgh7ssq-ew.a.run.app
+
