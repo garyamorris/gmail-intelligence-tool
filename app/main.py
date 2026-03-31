@@ -25,6 +25,7 @@ from app.gmail_service import (
     list_messages,
 )
 from app.storage import MessageRecord, MessageStore
+from app.secrets_store import add_secret_version
 
 
 config = Config.validate()
@@ -224,7 +225,12 @@ def auth_callback(code: str):
         raise HTTPException(status_code=400, detail="Missing code")
     try:
         creds = exchange_auth_code(config.client_secrets_file, config.redirect_uri, code)
-        Path(config.token_path).write_text(creds.to_json(), encoding="utf-8")
+        token_json = creds.to_json()
+        Path(config.token_path).write_text(token_json, encoding="utf-8")
+        try:
+            add_secret_version("gmail-token-json", token_json)
+        except Exception:
+            pass
         return {"ok": True, "message": "Token saved. You can now use /api/sync"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"OAuth callback failed: {exc}")
