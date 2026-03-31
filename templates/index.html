@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gmail Intelligence Tool</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; background: #0b1020; color: #e7ecff; }
+      h1 { margin: 0 0 16px; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+      .card { background: #151a2b; border: 1px solid #2a3356; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+      button { background: #5b6fff; border: 0; color: white; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+      input, select { background: #0f1430; border: 1px solid #344078; color: #e7ecff; padding: 8px; border-radius: 8px; }
+      .small { font-size: 12px; color: #a3b0e8; }
+      .subject { font-weight: 600; }
+      .muted { color: #99a4d6; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+      .header { display: flex; justify-content: space-between; align-items: center; }
+      .message { display: grid; gap: 6px; }
+      .msg-meta { font-size: 12px; color: #98a6d9; }
+    </style>
+    <script>
+      async function api(path, options={}) {
+        const res = await fetch(path, {
+          headers: { 'Content-Type': 'application/json' },
+          ...options
+        });
+        if(!res.ok) throw new Error(await res.text());
+        return await res.json();
+      }
+
+      async function loadMessages() {
+        const q = document.getElementById('q').value;
+        const url = q ? `/api/messages?${new URLSearchParams({ q, include_archived: document.getElementById('archived').checked })}` : '/api/messages';
+        const rows = await api(url);
+        const container = document.getElementById('messages');
+        container.innerHTML = '';
+
+        rows.forEach(m => {
+          const el = document.createElement('div');
+          el.className='card message';
+          el.innerHTML = `
+            <div class="toolbar"><input type="checkbox" data-id="${m.id}"/></div>
+            <div class="subject">${escapeHtml(m.subject || '(no subject)')}</div>
+            <div class="msg-meta">${escapeHtml(m.sender)} • ${escapeHtml((new Date(m.date)).toLocaleString())}</div>
+            <div>${escapeHtml(m.snippet || '')}</div>
+            <div class="toolbar">
+              <button onclick="analyzeMessage('${m.id}')">Analyze actionability</button>
+              <button onclick="archiveSelected(['${m.id}'])">Archive</button>
+              <button onclick="handoff(['${m.id}'])">Send to agent</button>
+            </div>
+            <div id="analysis-${m.id}" class="small"></div>
+          `;
+          container.appendChild(el);
+        });
+      }
+
+      async function syncNow() {
+        const max = document.getElementById('max').value || '40';
+        const res = await api('/api/sync', { method: 'POST', body: JSON.stringify({ max_results: Number(max) }) });
+        document.getElementById('status').innerText = `Synced ${res.synced} messages`;
+        await loadMessages();
+      }
+
+      async function searchNow() {
+        const q = document.getElementById('search').value;
+        const rows = await api('/api/search?' + new URLSearchParams({ q, k: '20' }));
+        const container = document.getElementById('messages');
+        container.innerHTML = '';
+        rows.forEach(m => {
+          const el = document.createElement('div');
+          el.className='card message';
+          el.innerHTML = `
+            <div class="subject">${escapeHtml(m.subject || '(no subject)')}</div>
+            <div class="msg-meta">${escapeHtml(m.sender)} • score ${m.score?.toFixed(3) || 'n/a'}</div>
+            <div>${escapeHtml(m.snippet || '')}</div>
+            <div class="toolbar">
+              <button onclick="analyzeMessage('${m.id}')">Analyze actionability</button>
+              <button onclick="archiveSelected(['${m.id}'])">Archive</button>
+              <button onclick="handoff(['${m.id}'])">Send to agent</button>
+            </div>
+            <div id="analysis-${m.id}" class="small"></div>
+          `;
+          container.appendChild(el);
+        });
+      }
+
+      function selectedIds() {
+        return [...document.querySelectorAll('input[type=checkbox][data-id]:checked')].map(el => el.dataset.id);
+      }
+
+      async function archiveSelected(idsOverride = null) {
+        const ids = idsOverride || selectedIds();
+        if (!ids.length) return;
+        await api('/api/archive', { method: 'POST', body: JSON.stringify({ message_ids: ids }) });
+        document.getElementById('status').innerText = `Archived ${ids.length} messages`;
+        await loadMessages();
+      }
+
+      async function archiveByQuery() {
+        const q = document.getElementById('bulkQuery').value;
+        const limit = document.getElementById('bulkLimit').value || '30';
+        const res = await api('/api/bulk_archive_by_query', {
+          method: 'POST',
+          body: JSON.stringify({ query: q, limit: Number(limit) })
+        });
+        document.getElementById('status').innerText = `Archived ${res.archived} messages by query`;
+        await loadMessages();
+      }
+
+      async function analyzeMessage(id) {
+        const res = await api('/api/analyze', { method: 'POST', body: JSON.stringify({ message_id: id }) });
+        const el = document.getElementById(`analysis-${id}`);
+        el.innerText = `Actionable=${res.suggested_actionable} score=${res.actionability_score}`;
+      }
+
+      async function handoff(idsOverride = null) {
+        const ids = idsOverride || selectedIds();
+        const instruction = prompt('What should the agent do with these messages?', 'Summarize and propose actions');
+        if (!ids.length || !instruction) return;
+        await api('/api/agent/handoff', {
+          method: 'POST',
+          body: JSON.stringify({ message_ids: ids, instruction })
+        });
+        document.getElementById('status').innerText = `Handed off ${ids.length} messages to configured agent webhook`;
+      }
+
+      async function login() {
+        const r = await api('/auth/login');
+        if (r.auth_url) window.location = r.auth_url;
+      }
+
+      function escapeHtml(str) {
+        return (str || '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      loadMessages();
+    </script>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Gmail Intelligence Tool</h1>
+      <span id="status" class="small">Ready</span>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button onclick="login()">Authenticate Gmail</button>
+        <label><input type="checkbox" id="archived" /> Include Archived</label>
+        <button onclick="loadMessages()">Refresh</button>
+        <input id="q" placeholder="Local filter" />
+        <input id="max" type="number" value="40" min="1" />
+        <button onclick="syncNow()">Sync Gmail</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="search" placeholder="Semantic search" style="min-width:320px" />
+        <button onclick="searchNow()">Search</button>
+      </div>
+      <div class="row">
+        <input id="bulkQuery" value="in:inbox newer_than:30d" style="min-width:320px" />
+        <input id="bulkLimit" type="number" value="30" min="1" />
+        <button onclick="archiveByQuery()">Archive by Query</button>
+        <button onclick="archiveSelected()">Archive selected</button>
+      </div>
+    </div>
+
+    <div id="messages"></div>
+  </body>
+</html>
