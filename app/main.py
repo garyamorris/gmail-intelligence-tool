@@ -6,13 +6,11 @@ from typing import List, Optional
 
 import json
 
-from fastapi.responses import RedirectResponse
-
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-import httpx
 
 from app.config import Config
 from app.embeddings import EmbeddingService
@@ -24,6 +22,7 @@ from app.gmail_service import (
     get_google_auth_url,
     list_messages,
 )
+from app.intelligence import IntelligenceEngine
 from app.storage import MessageRecord, MessageStore
 from app.secrets_store import add_secret_version
 
@@ -31,6 +30,7 @@ from app.secrets_store import add_secret_version
 config = Config.validate()
 store = MessageStore(config.db_path)
 embedder: EmbeddingService | None = None
+intel = IntelligenceEngine()
 
 
 def _get_embedder() -> EmbeddingService:
@@ -73,6 +73,19 @@ def list_api(limit: int = 50, include_archived: bool = False, q: Optional[str] =
     return store.list_messages(include_archived=include_archived, limit=limit, query=q)
 
 
+@app.get("/api/topics")
+def topics_api(limit: int = 50, include_archived: bool = False):
+    return store.list_topics(include_archived=include_archived, limit=limit)
+
+
+@app.get("/api/briefing")
+def briefing_api(limit: int = 10):
+    return {
+        "top_messages": store.recent_briefing(limit=limit),
+        "action_items": store.list_action_items(limit=limit),
+    }
+
+
 @app.get("/api/search")
 def search_api(q: str, k: int = 20):
     if not q:
@@ -97,6 +110,7 @@ def sync_api(payload: dict):
 
     for ref in msg_refs:
         msg = fetch_full_message(svc, ref["id"])
+        analysis = intel.analyze(msg["subject"], msg["sender"], msg["snippet"], msg["body"])
         text_for_embedding = f"Subject: {msg['subject']}\nFrom: {msg['sender']}\n\n{msg['snippet']}\n{msg['body']}"
         vector = embed.embed([text_for_embedding])[0]
         records.append(
@@ -108,11 +122,19 @@ def sync_api(payload: dict):
                 date=msg["date"],
                 snippet=msg["snippet"],
                 body=msg["body"],
-                summary=None,
+                summary=analysis.summary,
                 labels=msg["labels"],
+                intent=analysis.intent,
+                suggested_action=analysis.suggested_action,
+                cluster_label=analysis.cluster_label,
+                actionability_score=analysis.actionability_score,
+                noise_score=analysis.noise_score,
+                reason_codes=analysis.reason_codes,
                 embedding=vector,
             )
         )
+        for item in intel.action_items(msg["subject"], msg["body"]):
+            store.add_action_items(msg["id"], [item])
 
     if records:
         store.bulk_upsert(records)
@@ -172,8 +194,14 @@ def analyze_api(payload: dict):
         "message_id": message_id,
         "subject": row["subject"],
         "sender": row["sender"],
+        "summary": row.get("summary"),
+        "intent": row.get("intent"),
+        "cluster_label": row.get("cluster_label"),
+        "suggested_action": row.get("suggested_action"),
         "suggested_actionable": score > 1,
-        "actionability_score": score,
+        "actionability_score": row.get("actionability_score", score),
+        "noise_score": row.get("noise_score", 0),
+        "reason_codes": row.get("reason_codes", []),
     }
 
 
@@ -215,7 +243,6 @@ def auth_login(mode: str = "json"):
 
 @app.get("/auth/start")
 def auth_start():
-    # One-tap path for phone users: open this URL and it jumps straight to Google consent.
     return auth_login(mode="redirect")
 
 

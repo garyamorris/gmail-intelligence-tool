@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Optional
+
+import numpy as np
 
 
 @dataclass
@@ -20,6 +21,12 @@ class MessageRecord:
     body: str
     summary: Optional[str]
     labels: List[str]
+    intent: str = "reply_needed"
+    suggested_action: str = "review"
+    cluster_label: str = "Uncategorized"
+    actionability_score: int = 0
+    noise_score: int = 0
+    reason_codes: List[str] = field(default_factory=list)
     is_archived: bool = False
     created_at: str = ""
     embedding: Optional[np.ndarray] = None
@@ -45,6 +52,12 @@ class MessageStore:
               body TEXT,
               summary TEXT,
               labels TEXT,
+              intent TEXT DEFAULT 'reply_needed',
+              suggested_action TEXT DEFAULT 'review',
+              cluster_label TEXT DEFAULT 'Uncategorized',
+              actionability_score INTEGER DEFAULT 0,
+              noise_score INTEGER DEFAULT 0,
+              reason_codes TEXT DEFAULT '[]',
               is_archived INTEGER DEFAULT 0,
               created_at TEXT,
               embedding BLOB
@@ -52,6 +65,18 @@ class MessageStore:
 
             CREATE INDEX IF NOT EXISTS idx_messages_archived_date
             ON messages (is_archived, date);
+
+            CREATE INDEX IF NOT EXISTS idx_messages_thread_id
+            ON messages (thread_id);
+
+            CREATE TABLE IF NOT EXISTS action_items (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              message_id TEXT NOT NULL,
+              item TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'open',
+              created_at TEXT NOT NULL,
+              FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE
+            );
             """
         )
         self.conn.commit()
@@ -59,8 +84,8 @@ class MessageStore:
     def upsert_message(self, rec: MessageRecord):
         self.conn.execute(
             """
-            INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, is_archived, created_at, embedding)
-            VALUES (:id, :thread_id, :subject, :sender, :date, :snippet, :body, :summary, :labels, :is_archived, :created_at, :embedding)
+            INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, intent, suggested_action, cluster_label, actionability_score, noise_score, reason_codes, is_archived, created_at, embedding)
+            VALUES (:id, :thread_id, :subject, :sender, :date, :snippet, :body, :summary, :labels, :intent, :suggested_action, :cluster_label, :actionability_score, :noise_score, :reason_codes, :is_archived, :created_at, :embedding)
             ON CONFLICT(id) DO UPDATE SET
               thread_id=excluded.thread_id,
               subject=excluded.subject,
@@ -70,24 +95,17 @@ class MessageStore:
               body=excluded.body,
               summary=excluded.summary,
               labels=excluded.labels,
+              intent=excluded.intent,
+              suggested_action=excluded.suggested_action,
+              cluster_label=excluded.cluster_label,
+              actionability_score=excluded.actionability_score,
+              noise_score=excluded.noise_score,
+              reason_codes=excluded.reason_codes,
               is_archived=excluded.is_archived,
               created_at=excluded.created_at,
               embedding=excluded.embedding
             """,
-            {
-                "id": rec.id,
-                "thread_id": rec.thread_id,
-                "subject": rec.subject,
-                "sender": rec.sender,
-                "date": rec.date,
-                "snippet": rec.snippet,
-                "body": rec.body,
-                "summary": rec.summary,
-                "labels": json.dumps(rec.labels),
-                "is_archived": 1 if rec.is_archived else 0,
-                "created_at": rec.created_at or datetime.utcnow().isoformat(),
-                "embedding": rec.embedding.astype(np.float32).tobytes() if rec.embedding is not None else None,
-            },
+            self._record_params(rec),
         )
         self.conn.commit()
 
@@ -96,8 +114,8 @@ class MessageStore:
         for rec in records:
             cur.execute(
                 """
-                INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, is_archived, created_at, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, intent, suggested_action, cluster_label, actionability_score, noise_score, reason_codes, is_archived, created_at, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                   thread_id=excluded.thread_id,
                   subject=excluded.subject,
@@ -107,6 +125,12 @@ class MessageStore:
                   body=excluded.body,
                   summary=excluded.summary,
                   labels=excluded.labels,
+                  intent=excluded.intent,
+                  suggested_action=excluded.suggested_action,
+                  cluster_label=excluded.cluster_label,
+                  actionability_score=excluded.actionability_score,
+                  noise_score=excluded.noise_score,
+                  reason_codes=excluded.reason_codes,
                   is_archived=excluded.is_archived,
                   created_at=excluded.created_at,
                   embedding=excluded.embedding
@@ -121,6 +145,12 @@ class MessageStore:
                     rec.body,
                     rec.summary,
                     json.dumps(rec.labels),
+                    rec.intent,
+                    rec.suggested_action,
+                    rec.cluster_label,
+                    int(rec.actionability_score),
+                    int(rec.noise_score),
+                    json.dumps(rec.reason_codes or []),
                     1 if rec.is_archived else 0,
                     rec.created_at or datetime.utcnow().isoformat(),
                     rec.embedding.astype(np.float32).tobytes() if rec.embedding is not None else None,
@@ -128,13 +158,39 @@ class MessageStore:
             )
         self.conn.commit()
 
+    def add_action_items(self, message_id: str, items: list[str]):
+        if not items:
+            return 0
+        created_at = datetime.utcnow().isoformat()
+        cur = self.conn.cursor()
+        for item in items:
+            cur.execute(
+                "INSERT INTO action_items (message_id, item, created_at) VALUES (?, ?, ?)",
+                (message_id, item, created_at),
+            )
+        self.conn.commit()
+        return cur.rowcount
+
+    def list_action_items(self, limit: int = 50):
+        rows = self.conn.execute(
+            """
+            SELECT ai.*, m.subject, m.sender, m.cluster_label
+            FROM action_items ai
+            JOIN messages m ON m.id = ai.message_id
+            ORDER BY datetime(ai.created_at) DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def list_messages(self, include_archived: bool = False, limit: int = 100, query: str | None = None):
         q = "SELECT * FROM messages"
         clauses = []
         if not include_archived:
             clauses.append("is_archived = 0")
         if query:
-            clauses.append("(subject LIKE ? OR sender LIKE ? OR body LIKE ? OR snippet LIKE ?)")
+            clauses.append("(subject LIKE ? OR sender LIKE ? OR body LIKE ? OR snippet LIKE ? OR cluster_label LIKE ? OR intent LIKE ?)")
         if clauses:
             q += " WHERE " + " AND ".join(clauses)
         q += " ORDER BY datetime(date) DESC LIMIT ?"
@@ -142,11 +198,40 @@ class MessageStore:
         params = []
         if query:
             like = f"%{query}%"
-            params.extend([like, like, like, like])
+            params.extend([like, like, like, like, like, like])
         params.append(limit)
 
         rows = self.conn.execute(q, params).fetchall()
         return [self._row_to_dict(r) for r in rows]
+
+    def list_topics(self, include_archived: bool = False, limit: int = 50):
+        q = """
+        SELECT cluster_label, COUNT(*) as message_count,
+               SUM(CASE WHEN is_archived = 0 THEN 1 ELSE 0 END) as active_count,
+               MAX(date) as latest_date,
+               MAX(sender) as latest_sender,
+               SUM(actionability_score) as total_actionability,
+               SUM(noise_score) as total_noise
+        FROM messages
+        """
+        if not include_archived:
+            q += " WHERE is_archived = 0"
+        q += " GROUP BY cluster_label ORDER BY latest_date DESC LIMIT ?"
+        rows = self.conn.execute(q, (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def recent_briefing(self, limit: int = 10):
+        rows = self.conn.execute(
+            """
+            SELECT id, subject, sender, date, cluster_label, intent, suggested_action, actionability_score, noise_score, is_archived
+            FROM messages
+            WHERE is_archived = 0
+            ORDER BY actionability_score DESC, datetime(date) DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def set_archived(self, message_ids: list[str], archived: bool):
         if not message_ids:
@@ -184,9 +269,32 @@ class MessageStore:
             return None
         return self._row_to_dict(row)
 
+    def _record_params(self, rec: MessageRecord):
+        return {
+            "id": rec.id,
+            "thread_id": rec.thread_id,
+            "subject": rec.subject,
+            "sender": rec.sender,
+            "date": rec.date,
+            "snippet": rec.snippet,
+            "body": rec.body,
+            "summary": rec.summary,
+            "labels": json.dumps(rec.labels),
+            "intent": rec.intent,
+            "suggested_action": rec.suggested_action,
+            "cluster_label": rec.cluster_label,
+            "actionability_score": int(rec.actionability_score),
+            "noise_score": int(rec.noise_score),
+            "reason_codes": json.dumps(rec.reason_codes or []),
+            "is_archived": 1 if rec.is_archived else 0,
+            "created_at": rec.created_at or datetime.utcnow().isoformat(),
+            "embedding": rec.embedding.astype(np.float32).tobytes() if rec.embedding is not None else None,
+        }
+
     def _row_to_dict(self, row):
         rec = dict(row)
         rec["labels"] = json.loads(rec["labels"]) if rec.get("labels") else []
+        rec["reason_codes"] = json.loads(rec["reason_codes"]) if rec.get("reason_codes") else []
         rec["is_archived"] = bool(rec["is_archived"])
         return rec
 
@@ -200,16 +308,17 @@ class MessageStore:
         if vecs.ndim != 2:
             return []
 
-        # cosine similarity
         num = vecs @ qvec
         den = np.linalg.norm(vecs, axis=1) * (np.linalg.norm(qvec) + 1e-9)
         score = num / np.maximum(den, 1e-9)
 
         idx = np.argsort(score)[::-1][:top_k]
         top_ids = [stored[i][0] for i in idx]
+        if not top_ids:
+            return []
 
         rows = self.conn.execute(
-            f"SELECT * FROM messages WHERE id IN ({','.join('?' * len(top_ids))})",
+            f"SELECT * FROM messages WHERE id IN ({','.join('?' for _ in top_ids)})",
             top_ids,
         ).fetchall()
 
