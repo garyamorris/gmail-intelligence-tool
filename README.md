@@ -52,7 +52,9 @@ Open: <http://localhost:8080>.
 ## Environment Variables
 
 - `GMAIL_CLIENT_SECRETS` (default: `./credentials/client_secret.json`)
+- `GMAIL_CLIENT_SECRETS_JSON` (optional alternative: provide OAuth client JSON directly)
 - `GMAIL_TOKEN_PATH` (default: `./credentials/token.json`)
+- `GMAIL_TOKEN_JSON` (optional alternative: provide serialized token JSON directly)
 - `GMAIL_USER_EMAIL` (default: optional, set to `gary.a.morris@gmail.com`)
 - `GEMINI_API_KEY` (required for embeddings)
 - `GEMINI_MODEL` (default: `models/embedding-001`)
