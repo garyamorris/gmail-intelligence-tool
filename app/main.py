@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
+import json
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -174,9 +176,35 @@ def analyze_api(payload: dict):
 
 @app.get("/auth/login")
 def auth_login():
-    if not Path(config.client_secrets_file).exists():
+    path = Path(config.client_secrets_file)
+    if not path.exists():
         raise HTTPException(status_code=400, detail="GMAIL_CLIENT_SECRETS file missing")
-    return {"auth_url": get_google_auth_url(config.client_secrets_file, config.redirect_uri)}
+
+    raw = path.read_text(encoding="utf-8").strip()
+    if not raw or raw == "{}":
+        raise HTTPException(
+            status_code=400,
+            detail="OAuth client secret is empty placeholder. Replace gmail-client-secrets-json with a real Google OAuth client_secret.json",
+        )
+
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        raise HTTPException(status_code=400, detail="GMAIL_CLIENT_SECRETS is not valid JSON")
+
+    if not payload.get("installed") and not payload.get("web"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OAuth client type. Create a Web or Installed app client in Google Cloud OAuth credentials.",
+        )
+
+    try:
+        return {"auth_url": get_google_auth_url(config.client_secrets_file, config.redirect_uri)}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create auth URL from client secret: {exc}",
+        )
 
 
 @app.get("/auth/callback")
