@@ -122,7 +122,13 @@ gcloud run deploy gmail-intelligence-tool \
   --allow-unauthenticated
 ```
 
-### 4) Optional: mount Cloud Storage for DB persistence
+### 4) Super-easy mobile auth
+
+- Open once in browser:
+  - `https://gmail-intelligence-tool-3pzvgh7ssq-ew.a.run.app/auth/start`
+- It now redirects directly to Google sign-in (no JSON copy/paste).
+
+### 5) Optional: mount Cloud Storage for DB persistence
 
 `/app/data/messages.db` is currently local to container; for durable history use Cloud SQL or managed storage.
 

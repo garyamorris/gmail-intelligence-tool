@@ -6,6 +6,8 @@ from typing import List, Optional
 
 import json
 
+from fastapi.responses import RedirectResponse
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -175,7 +177,7 @@ def analyze_api(payload: dict):
 
 
 @app.get("/auth/login")
-def auth_login():
+def auth_login(mode: str = "json"):
     path = Path(config.client_secrets_file)
     if not path.exists():
         raise HTTPException(status_code=400, detail="GMAIL_CLIENT_SECRETS file missing")
@@ -199,12 +201,21 @@ def auth_login():
         )
 
     try:
-        return {"auth_url": get_google_auth_url(config.client_secrets_file, config.redirect_uri)}
+        auth_url = get_google_auth_url(config.client_secrets_file, config.redirect_uri)
+        if mode == "redirect":
+            return RedirectResponse(url=auth_url, status_code=302)
+        return {"auth_url": auth_url}
     except Exception as exc:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create auth URL from client secret: {exc}",
         )
+
+
+@app.get("/auth/start")
+def auth_start():
+    # One-tap path for phone users: open this URL and it jumps straight to Google consent.
+    return auth_login(mode="redirect")
 
 
 @app.get("/auth/callback")
