@@ -30,5 +30,5 @@ options:
 substitutions:
   _SERVICE_NAME: gmail-intelligence-tool
   _REGION: europe-west1
-  _IMAGE_NAME: gcr.io/cognerys-site/gmail-intelligence-tool
+  _IMAGE_NAME: gcr.io/gen-lang-client-0045607209/gmail-intelligence-tool
   _GMAIL_USER_EMAIL: ''
