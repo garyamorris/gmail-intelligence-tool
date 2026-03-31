@@ -19,7 +19,7 @@ steps:
       - '--region=$_REGION'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--set-env-vars=GMAIL_USER_EMAIL=$_GMAIL_USER_EMAIL,EMBEDDING_MODEL=models/text-embedding-004'
+      - '--set-env-vars=GMAIL_USER_EMAIL=$_GMAIL_USER_EMAIL,EMBEDDING_MODEL=models/text-embedding-004,GMAIL_REDIRECT_URI=https://gmail-intelligence-tool-xeddple6fa-ew.a.run.app/auth/callback'
 
 images:
   - '$_IMAGE_NAME'
