@@ -27,6 +27,7 @@ class MessageRecord:
     actionability_score: int = 0
     noise_score: int = 0
     reason_codes: List[str] = field(default_factory=list)
+    unsubscribe_url: str = ""
     is_archived: bool = False
     created_at: str = ""
     embedding: Optional[object] = None
@@ -58,6 +59,7 @@ class MessageStore:
               actionability_score INTEGER DEFAULT 0,
               noise_score INTEGER DEFAULT 0,
               reason_codes TEXT DEFAULT '[]',
+              unsubscribe_url TEXT DEFAULT '',
               is_archived INTEGER DEFAULT 0,
               created_at TEXT,
               embedding BLOB
@@ -83,6 +85,14 @@ class MessageStore:
             """
         )
         self.conn.commit()
+        self._ensure_optional_columns()
+
+
+    def _ensure_optional_columns(self):
+        cols = {row["name"] for row in self.conn.execute("PRAGMA table_info(messages)").fetchall()}
+        if "unsubscribe_url" not in cols:
+            self.conn.execute("ALTER TABLE messages ADD COLUMN unsubscribe_url TEXT DEFAULT ''")
+            self.conn.commit()
 
     def _embedding_bytes(self, embedding):
         if embedding is None:
@@ -93,8 +103,8 @@ class MessageStore:
     def upsert_message(self, rec: MessageRecord):
         self.conn.execute(
             """
-            INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, intent, suggested_action, cluster_label, actionability_score, noise_score, reason_codes, is_archived, created_at, embedding)
-            VALUES (:id, :thread_id, :subject, :sender, :date, :snippet, :body, :summary, :labels, :intent, :suggested_action, :cluster_label, :actionability_score, :noise_score, :reason_codes, :is_archived, :created_at, :embedding)
+            INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, intent, suggested_action, cluster_label, actionability_score, noise_score, reason_codes, unsubscribe_url, is_archived, created_at, embedding)
+            VALUES (:id, :thread_id, :subject, :sender, :date, :snippet, :body, :summary, :labels, :intent, :suggested_action, :cluster_label, :actionability_score, :noise_score, :reason_codes, :unsubscribe_url, :is_archived, :created_at, :embedding)
             ON CONFLICT(id) DO UPDATE SET
               thread_id=excluded.thread_id,
               subject=excluded.subject,
@@ -110,6 +120,7 @@ class MessageStore:
               actionability_score=excluded.actionability_score,
               noise_score=excluded.noise_score,
               reason_codes=excluded.reason_codes,
+              unsubscribe_url=excluded.unsubscribe_url,
               is_archived=excluded.is_archived,
               created_at=excluded.created_at,
               embedding=excluded.embedding
@@ -123,8 +134,8 @@ class MessageStore:
         for rec in records:
             cur.execute(
                 """
-                INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, intent, suggested_action, cluster_label, actionability_score, noise_score, reason_codes, is_archived, created_at, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO messages (id, thread_id, subject, sender, date, snippet, body, summary, labels, intent, suggested_action, cluster_label, actionability_score, noise_score, reason_codes, unsubscribe_url, is_archived, created_at, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                   thread_id=excluded.thread_id,
                   subject=excluded.subject,
@@ -140,6 +151,7 @@ class MessageStore:
                   actionability_score=excluded.actionability_score,
                   noise_score=excluded.noise_score,
                   reason_codes=excluded.reason_codes,
+                  unsubscribe_url=excluded.unsubscribe_url,
                   is_archived=excluded.is_archived,
                   created_at=excluded.created_at,
                   embedding=excluded.embedding
@@ -160,6 +172,7 @@ class MessageStore:
                     int(rec.actionability_score),
                     int(rec.noise_score),
                     json.dumps(rec.reason_codes or []),
+                    rec.unsubscribe_url,
                     1 if rec.is_archived else 0,
                     rec.created_at or datetime.utcnow().isoformat(),
                     self._embedding_bytes(rec.embedding),
@@ -322,6 +335,7 @@ class MessageStore:
             "actionability_score": int(rec.actionability_score),
             "noise_score": int(rec.noise_score),
             "reason_codes": json.dumps(rec.reason_codes or []),
+            "unsubscribe_url": rec.unsubscribe_url,
             "is_archived": 1 if rec.is_archived else 0,
             "created_at": rec.created_at or datetime.utcnow().isoformat(),
             "embedding": self._embedding_bytes(rec.embedding),
@@ -332,6 +346,7 @@ class MessageStore:
         rec.pop("embedding", None)
         rec["labels"] = json.loads(rec["labels"]) if rec.get("labels") else []
         rec["reason_codes"] = json.loads(rec["reason_codes"]) if rec.get("reason_codes") else []
+        rec["unsubscribe_url"] = rec.get("unsubscribe_url") or ""
         rec["is_archived"] = bool(rec["is_archived"])
         return rec
 

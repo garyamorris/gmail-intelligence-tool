@@ -82,6 +82,7 @@ def _sync_messages(max_results: int = 40, query: str = "in:anywhere -in:spam -in
                 actionability_score=analysis.actionability_score,
                 noise_score=analysis.noise_score,
                 reason_codes=analysis.reason_codes,
+                unsubscribe_url=msg.get("unsubscribe_url", ""),
                 embedding=vector,
             )
         )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import html
 import os
+import re
 from datetime import datetime
 from email.header import decode_header
 from typing import Any, Dict
@@ -54,19 +55,30 @@ def _pluck_text(payload: Dict[str, Any]) -> str:
         return html.unescape(txt)
 
     for part in payload.get("parts", []) or []:
-        mime = part.get("mimeType", "")
         ptxt = _pluck_text(part)
         if ptxt:
             return ptxt
     return ""
 
 
+def _extract_unsubscribe(headers: dict[str, str], body: str) -> str | None:
+    raw = headers.get("list-unsubscribe", "")
+    if raw:
+        m = re.search(r"<(https?://[^>]+)>", raw, flags=re.I)
+        if m:
+            return m.group(1)
+        m = re.search(r"(https?://[^,\s]+)", raw, flags=re.I)
+        if m:
+            return m.group(1)
+    body_match = re.search(r"https?://[^\s'\">]+unsubscribe[^\s'\">]*", body, flags=re.I)
+    if body_match:
+        return body_match.group(0)
+    return None
+
+
 def get_google_auth_url(client_secrets_file: str, redirect_uri: str) -> str:
     flow = Flow.from_client_secrets_file(client_secrets_file, scopes=SCOPES, redirect_uri=redirect_uri)
-    url, _ = flow.authorization_url(
-        access_type="offline",
-        prompt="consent",
-    )
+    url, _ = flow.authorization_url(access_type="offline", prompt="consent")
     return url
 
 
@@ -109,6 +121,7 @@ def parse_message(msg: Dict[str, Any], body: str) -> Dict[str, str]:
     subject = _decode_header_value(headers.get("subject", ""))
     sender = _decode_header_value(headers.get("from", ""))
     date = headers.get("date") or datetime.utcnow().isoformat()
+    unsubscribe_url = _extract_unsubscribe(headers, body)
 
     return {
         "id": msg["id"],
@@ -119,6 +132,7 @@ def parse_message(msg: Dict[str, Any], body: str) -> Dict[str, str]:
         "snippet": msg.get("snippet", ""),
         "body": body[:4000],
         "labels": msg.get("labelIds", []) or [],
+        "unsubscribe_url": unsubscribe_url or "",
     }
 
 
