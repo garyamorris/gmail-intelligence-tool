@@ -52,7 +52,7 @@ def _bootstrap_token_file() -> None:
         pass
 
 
-def _sync_messages(max_results: int = 40, query: str = "in:inbox") -> int:
+def _sync_messages(max_results: int = 40, query: str = "in:anywhere -in:spam -in:trash") -> int:
     _bootstrap_token_file()
     svc = build_gmail_service(str(config.token_path), config.client_secrets_file)
     msg_refs = list_messages(svc, query=query, max_results=max_results)
@@ -121,6 +121,17 @@ def health():
     return {"ok": True}
 
 
+@app.get("/api/status")
+def status_api():
+    return {
+        "messages": len(store.list_messages(include_archived=True, limit=1_000_000)),
+        "has_token_file": config.token_path.exists() and config.token_path.stat().st_size > 0,
+        "has_client_secrets": Path(config.client_secrets_file).exists(),
+        "redirect_uri": config.redirect_uri,
+        "secret_backed": True,
+    }
+
+
 @app.get("/api/messages")
 def list_api(limit: int = 50, include_archived: bool = False, q: Optional[str] = None):
     return store.list_messages(include_archived=include_archived, limit=limit, query=q)
@@ -182,14 +193,20 @@ def search_api(q: str, k: int = 20):
 def sync_api(payload: dict):
     try:
         max_results = int(payload.get("max_results", 40))
-        query = payload.get("query", "in:inbox")
+        query = payload.get("query", "in:anywhere -in:spam -in:trash")
         synced = _sync_messages(max_results=max_results, query=query)
-        return {"synced": synced}
+        return {"synced": synced, "query": query}
     except Exception as exc:
         return JSONResponse(
             status_code=500,
             content={"error": str(exc), "trace": traceback.format_exc(limit=6)},
         )
+
+
+@app.post("/api/bootstrap")
+def bootstrap_api():
+    synced = _sync_messages(max_results=50, query="in:anywhere -in:spam -in:trash")
+    return {"synced": synced}
 
 
 @app.post("/api/archive")
@@ -302,7 +319,7 @@ def auth_callback(code: str):
         except Exception:
             pass
         try:
-            _sync_messages(max_results=25, query="in:inbox")
+            _sync_messages(max_results=25, query="in:anywhere -in:spam -in:trash")
         except Exception:
             pass
         return RedirectResponse(url="/?auth=ok&synced=1", status_code=302)
