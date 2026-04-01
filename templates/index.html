@@ -5,112 +5,113 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Gmail Intelligence Tool</title>
     <style>
-      :root { --bg:#08101f; --panel:rgba(15,20,38,.94); --panel-2:rgba(18,25,48,.98); --line:#26325c; --text:#e8eeff; --muted:#96a5d8; --accent:#6e7cff; --accent-2:#56d3ff; --good:#4ade80; --warn:#fbbf24; --bad:#fb7185; --shadow:0 16px 48px rgba(0,0,0,.22); }
+      :root { --bg:#08101f; --panel:rgba(15,20,38,.94); --panel-2:rgba(18,25,48,.98); --line:#26325c; --text:#e8eeff; --muted:#96a5d8; --accent:#6e7cff; --good:#4ade80; --warn:#fbbf24; --bad:#fb7185; --shadow:0 16px 48px rgba(0,0,0,.22); }
       * { box-sizing: border-box; }
       html, body { height: 100%; }
-      body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: radial-gradient(circle at top left, rgba(110,124,255,.16), transparent 28%), radial-gradient(circle at top right, rgba(86,211,255,.08), transparent 18%), var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-      .shell { width: min(1200px, 100%); margin: 0 auto; padding: 16px; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
-      .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-      h1 { margin: 0; font-size: clamp(22px, 4.5vw, 30px); line-height: 1.1; }
-      .sub { color: var(--muted); margin-top: 6px; font-size: 13px; }
-      .status-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: rgba(15,20,38,.75); color: var(--muted); font-size: 12px; white-space: nowrap; max-width: 48vw; overflow: hidden; text-overflow: ellipsis; }
-      .stack { display: grid; gap: 12px; }
-      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
-      .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 10px; }
-      .row { display: flex; gap: 10px; flex-wrap: wrap; }
-      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
-      button { appearance: none; border: 0; border-radius: 14px; padding: 12px 14px; min-height: 44px; cursor: pointer; font-weight: 700; font-size: 14px; background: linear-gradient(180deg, var(--accent), #4c62ff); color: white; touch-action: manipulation; }
-      button.secondary { background: rgba(24,32,62,.95); border: 1px solid var(--line); color: var(--text); }
-      button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
-      input { width: 100%; min-height: 46px; background: rgba(10,15,28,.94); border: 1px solid var(--line); color: var(--text); padding: 12px 14px; border-radius: 14px; font-size: 16px; }
-      .field { width: 100%; }
-      .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(15,20,38,.7); color: var(--muted); font-size: 12px; }
-      .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: rgba(110,124,255,.12); color: #cdd4ff; border: 1px solid rgba(110,124,255,.25); }
-      .badge.good { background: rgba(74,222,128,.10); color: #abf0c1; border-color: rgba(74,222,128,.2); }
-      .badge.warn { background: rgba(251,191,36,.10); color: #fde68a; border-color: rgba(251,191,36,.2); }
-      .badge.bad { background: rgba(251,113,133,.10); color: #fda4af; border-color: rgba(251,113,133,.2); }
-      .error { display: none; margin: 12px 0; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(251,113,133,.35); background: rgba(251,113,133,.10); color: #fda4af; font-size: 13px; white-space: pre-wrap; }
-      .grid { display: grid; gap: 12px; }
-      .hero-card { display: grid; gap: 10px; }
-      .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-      .kpis > div { background: rgba(18,25,48,.95); border: 1px solid var(--line); border-radius: 14px; padding: 10px; min-width: 0; }
-      .kpis .num { font-size: 20px; font-weight: 800; line-height: 1.1; }
-      .kpis .label { font-size: 11px; color: var(--muted); margin-top: 4px; }
-      .lane-list, .topic-list, .message-list, .action-list, .sender-list { display: grid; gap: 10px; }
-      .lane-chip, .topic-chip { text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-      .message-card, .topic-card, .detail-card, .sender-card { background: var(--panel-2); border: 1px solid rgba(38,50,92,.9); border-radius: 16px; padding: 14px; }
-      .message-head, .topic-head, .detail-head, .sender-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
-      .title { font-weight: 800; line-height: 1.25; font-size: 16px; }
-      .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
-      .small { font-size: 12px; color: var(--muted); }
-      .spacer { height: 10px; }
-      .divider { height: 1px; background: rgba(38,50,92,.8); margin: 12px 0; }
-      .search-wrap { display: grid; gap: 10px; }
-      .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: rgba(5,10,20,.86); backdrop-filter: blur(18px); border-top: 1px solid rgba(38,50,92,.85); z-index: 50; }
-      .bottom-nav .nav-inner { width: min(1200px, 100%); margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-      .bottom-nav button { width: 100%; }
-      .hidden { display: none !important; }
-      .swipe-track { overflow: hidden; border-radius: 16px; }
-      .swipe-card { position: relative; touch-action: pan-y; transition: transform .18s ease, opacity .18s ease; }
-      .swipe-actions {
-        position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: stretch; pointer-events: none;
+      body { margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:radial-gradient(circle at top left, rgba(110,124,255,.16), transparent 28%), radial-gradient(circle at top right, rgba(86,211,255,.08), transparent 18%), var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+      .shell { width:min(1280px,100%); margin:0 auto; padding:16px; padding-bottom:calc(92px + env(safe-area-inset-bottom)); }
+      .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
+      h1 { margin:0; font-size:clamp(22px,4.5vw,30px); line-height:1.1; }
+      .sub { color:var(--muted); margin-top:6px; font-size:13px; }
+      .status-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--line); border-radius:999px; background:rgba(15,20,38,.75); color:var(--muted); font-size:12px; white-space:nowrap; max-width:48vw; overflow:hidden; text-overflow:ellipsis; }
+      .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:14px; box-shadow:var(--shadow); }
+      .section-title { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:10px; }
+      .row, .toolbar, .stack { display:flex; gap:10px; flex-wrap:wrap; }
+      .stack { display:grid; gap:12px; }
+      button { appearance:none; border:0; border-radius:14px; padding:12px 14px; min-height:44px; cursor:pointer; font-weight:700; font-size:14px; background:linear-gradient(180deg,var(--accent),#4c62ff); color:white; }
+      button.secondary { background:rgba(24,32,62,.95); border:1px solid var(--line); color:var(--text); }
+      input { width:100%; min-height:46px; background:rgba(10,15,28,.94); border:1px solid var(--line); color:var(--text); padding:12px 14px; border-radius:14px; font-size:16px; }
+      .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; background:rgba(110,124,255,.12); color:#cdd4ff; border:1px solid rgba(110,124,255,.25); }
+      .badge.good { background:rgba(74,222,128,.10); color:#abf0c1; border-color:rgba(74,222,128,.2); }
+      .badge.warn { background:rgba(251,191,36,.10); color:#fde68a; border-color:rgba(251,191,36,.2); }
+      .badge.bad { background:rgba(251,113,133,.10); color:#fda4af; border-color:rgba(251,113,133,.2); }
+      .error { display:none; margin:12px 0; padding:12px 14px; border-radius:14px; border:1px solid rgba(251,113,133,.35); background:rgba(251,113,133,.10); color:#fda4af; font-size:13px; white-space:pre-wrap; }
+      .layout { display:grid; gap:12px; }
+      .left-col, .center-col, .right-col { display:grid; gap:12px; }
+      .lane-list, .topic-list, .message-list, .sender-list { display:grid; gap:10px; }
+      .lane-chip, .topic-chip { text-align:left; width:100%; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+      .message-shell { position:relative; overflow:hidden; border-radius:16px; }
+      .message-bg { position:absolute; inset:0; display:flex; justify-content:flex-end; align-items:center; padding:0 14px; background:rgba(251,113,133,.12); border:1px solid rgba(251,113,133,.24); border-radius:16px; color:#fda4af; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+      .message-card, .detail-card, .sender-card { position:relative; background:var(--panel-2); border:1px solid rgba(38,50,92,.9); border-radius:16px; padding:14px; transform:translate3d(0,0,0); transition:transform .18s ease, opacity .18s ease; touch-action:pan-y; }
+      .message-head, .detail-head, .sender-head { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start; }
+      .title { font-weight:800; line-height:1.25; font-size:16px; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+      .meta, .small { font-size:12px; color:var(--muted); min-width:0; overflow-wrap:anywhere; }
+      .thread-preview { font-size:13px; color:var(--text); opacity:.92; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .spacer { height:10px; }
+      .toggle-row { display:flex; gap:8px; flex-wrap:wrap; }
+      .briefing .kpis { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
+      .briefing .kpis > div { background:rgba(18,25,48,.95); border:1px solid var(--line); border-radius:14px; padding:10px; }
+      .num { font-size:20px; font-weight:800; }
+      .bottom-nav { position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(5,10,20,.86); backdrop-filter:blur(18px); border-top:1px solid rgba(38,50,92,.85); z-index:50; }
+      .bottom-nav .nav-inner { width:min(1280px,100%); margin:0 auto; display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+      .mobile-detail-overlay { position:fixed; inset:0; background:rgba(4,8,16,.82); backdrop-filter:blur(6px); z-index:60; display:none; }
+      .mobile-detail-sheet { position:absolute; inset:12px 12px calc(76px + env(safe-area-inset-bottom)) 12px; background:var(--panel); border:1px solid var(--line); border-radius:20px; overflow:auto; padding:14px; box-shadow:var(--shadow); }
+      .sheet-top { display:flex; justify-content:space-between; align-items:center; gap:10px; position:sticky; top:0; background:linear-gradient(180deg,var(--panel),rgba(15,20,38,.94)); padding-bottom:10px; }
+      .hidden { display:none !important; }
+      @media (min-width: 980px) {
+        .shell { width:min(1440px,100%); padding:20px; padding-bottom:24px; }
+        .layout { grid-template-columns:260px 1fr 360px; align-items:start; }
+        .bottom-nav, .mobile-detail-overlay { display:none !important; }
       }
-      .swipe-actions > div {
-        display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: 0;
+      @media (max-width: 979px) {
+        .left-col, .right-col { display:none; }
+        .left-col.show, .right-col.show { display:grid; }
+        .message-card { padding:12px; }
       }
-      .swipe-left { color: #fda4af; }
-      .swipe-right { color: #abf0c1; justify-content: flex-end; }
-      @media (min-width: 900px) { .shell { width: min(1400px, 100%); padding: 20px; padding-bottom: 24px; } .layout { display: grid; grid-template-columns: 280px 1fr 340px; gap: 14px; align-items: start; } .left-col, .center-col, .right-col { display: grid; gap: 12px; } .bottom-nav { display: none; } }
-      @media (max-width: 899px) { .layout { display: grid; gap: 12px; } .left-col, .right-col { display: none; } .left-col.show, .right-col.show { display: grid; } .kpis { grid-template-columns: repeat(3, 1fr); } .title { font-size: 15px; } .message-card, .topic-card, .detail-card, .sender-card { padding: 12px; } }
-      @media (max-width: 560px) { .topbar { align-items: flex-start; } .status-chip { max-width: 42vw; } .kpis { grid-template-columns: 1fr; } .row { flex-direction: column; } .toolbar { flex-direction: column; } .toolbar button, .row button { width: 100%; } }
+      @media (max-width: 560px) {
+        .row, .toolbar { flex-direction:column; }
+        .row button, .toolbar button { width:100%; }
+        .briefing .kpis { grid-template-columns:1fr; }
+      }
     </style>
     <script>
-      const state = { messages: [], topics: [], repeatSenders: [], currentTopic: null, lane: null, status: null, view: 'messages', busy: false, busyLabel: '' };
+      const state = { messages: [], topics: [], repeatSenders: [], currentTopic: null, lane: null, status: null, busy: false, busyLabel: '', mobileDetailOpen: false };
       const ui = { error: (msg) => { const el = document.getElementById('error'); el.style.display = msg ? 'block' : 'none'; el.innerText = msg || ''; } };
       window.addEventListener('error', e => ui.error(`Frontend error: ${e.message}`));
       window.addEventListener('unhandledrejection', e => ui.error(`Frontend promise error: ${e.reason?.message || e.reason}`));
       async function api(path, options={}) { const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options }); if (!res.ok) throw new Error(await res.text()); return await res.json(); }
-      function escapeHtml(str){ return (str||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
-      function badgeClass(score){ if(score>=4)return 'badge bad'; if(score>=2)return 'badge warn'; return 'badge good'; }
-      function setView(view) { state.view = view; document.querySelectorAll('[data-view]').forEach(el => el.classList.add('hidden')); document.querySelectorAll(`[data-view="${view}"]`).forEach(el => el.classList.remove('hidden')); }
-      function renderStatus(status){ const bits=[]; bits.push(status.has_token_file ? 'token ready' : 'no token'); bits.push(status.has_client_secrets ? 'client secrets ready' : 'no client secrets'); bits.push(`${status.messages || 0} stored`); bits.push('sorted newest → oldest'); document.getElementById('status').innerText = bits.join(' · '); }
-      async function openLane(name){ state.lane=name; state.currentTopic=null; const rows=await api(`/api/lane/${name}?limit=200`); state.messages=rows; state.topics=[]; renderTopics(); renderMessages(); setView('messages'); }
-      function renderTopics(){ const el=document.getElementById('topics'); el.innerHTML=''; const lanes=[{cluster_label:'Waiting on others',count:state.messages.filter(m=>['follow_up','acknowledgement'].includes(m.intent)||['set_follow_up','quiet'].includes(m.suggested_action)).length},{cluster_label:'Needs decision',count:state.messages.filter(m=>['approval','finance'].includes(m.intent)||(m.actionability_score||0)>=3).length},{cluster_label:'Noise',count:state.messages.filter(m=>(m.noise_score||0)>=2||['archive','quiet'].includes(m.suggested_action)).length},{cluster_label:'Reply now',count:state.messages.filter(m=>['reply','draft_schedule_reply','review_and_route'].includes(m.suggested_action)).length}]; lanes.forEach(t=>{ const node=document.createElement('button'); node.className='topic-chip secondary'; node.onclick=()=>{ state.currentTopic=t.cluster_label; renderTopics(); renderMessages(); setView('messages'); }; node.innerHTML=`<span>${escapeHtml(t.cluster_label)}</span><span class="badge">${t.count||0}</span>`; el.appendChild(node); }); }
-      function renderMessages(){ const rows=((state.currentTopic && state.topics.length)?state.messages.filter(m=>m.cluster_label===state.currentTopic):state.messages).slice().sort((a,b)=>new Date(b.date)-new Date(a.date)); const container=document.getElementById('messages'); container.innerHTML=''; rows.forEach(m=>{ const el=document.createElement('article'); el.className='message-card swipe-track'; const bClass=badgeClass(m.actionability_score||0); const sender = escapeHtml(m.sender || ''); el.innerHTML=`<div class="swipe-actions"><div class="swipe-left">Archive</div><div class="swipe-right">Open</div></div><div class="swipe-card" data-id="${escapeHtml(m.id)}" data-sender="${sender}"><div class="message-head"><div><div class="title">${escapeHtml(m.subject||'(no subject)')}</div><div class="meta">${sender} · ${escapeHtml((new Date(m.date)).toLocaleString())}</div></div><div style="display:grid;gap:6px;justify-items:end"><span class="badge">${escapeHtml(m.intent||'unknown')}</span><span class="${bClass}">score ${Number(m.actionability_score||0)}</span></div></div><div class="spacer"></div><div class="small">${escapeHtml(m.summary||m.snippet||'')}</div><div class="spacer"></div><div class="toggle-row"><span class="badge">${escapeHtml(m.cluster_label||'Uncategorized')}</span><span class="badge">${escapeHtml(m.suggested_action||'review')}</span><span class="badge">noise ${Number(m.noise_score||0)}</span></div><div class="spacer"></div><div class="toolbar"><button class="secondary" onclick="openDetail('${m.id}')">Open</button><button class="secondary" onclick="draftReply('${m.id}')">Draft</button><button class="secondary" onclick="analyzeMessage('${m.id}')">Analyze</button><button onclick="archiveSelected(['${m.id}'])">Archive</button></div><div class="small swipe-hint">Swipe left to archive · swipe right to open</div><div id="analysis-${m.id}" class="small"></div></div>`; container.appendChild(el); attachSwipe(el.querySelector('.swipe-card')); }); }
-      function attachSwipe(card){ let startX=0, currentX=0, tracking=false, settled=false; const threshold=70; const onMove=(x)=>{ currentX=x-startX; card.style.transform=`translateX(${currentX}px)`; card.style.opacity = `${Math.max(.75, 1 - Math.min(Math.abs(currentX)/300, .25))}`; };
-        const reset=()=>{ card.style.transform='translateX(0)'; card.style.opacity='1'; tracking=false; currentX=0; };
-        card.addEventListener('touchstart', e=>{ if(!e.touches.length) return; tracking=true; settled=false; startX=e.touches[0].clientX; currentX=startX; }, {passive:true});
-        card.addEventListener('touchmove', e=>{ if(!tracking) return; onMove(e.touches[0].clientX); }, {passive:true});
-        card.addEventListener('touchend', async ()=>{ if(!tracking || settled) return; settled=true; const delta=currentX-startX; if(delta < -threshold){ const id=card.dataset.id; card.style.transform='translateX(-120%)'; try{ await archiveSelected([id]); } finally { reset(); } } else if(delta > threshold){ const id=card.dataset.id; reset(); await openDetail(id); } else { reset(); } }, {passive:true});
+      const escapeHtml = (str) => (str||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+      const badgeClass = (score) => score>=4 ? 'badge bad' : score>=2 ? 'badge warn' : 'badge good';
+      const isMobile = () => window.matchMedia('(max-width: 979px)').matches;
+      function renderStatus(status){ const bits=[]; bits.push(status.has_token_file ? 'token ready' : 'no token'); bits.push(status.has_client_secrets ? 'client secrets ready' : 'no client secrets'); bits.push(`${status.messages || 0} stored`); bits.push('newest first'); document.getElementById('status').innerText = bits.join(' · '); }
+      function setBusy(label){ state.busy=true; document.getElementById('status').innerText = label || 'Working…'; document.querySelectorAll('button').forEach(b=>b.disabled=true); }
+      function clearBusy(text){ state.busy=false; document.querySelectorAll('button').forEach(b=>b.disabled=false); if(text) document.getElementById('status').innerText = text; }
+      function showPane(view){ if (isMobile()) { document.querySelector('.left-col')?.classList.toggle('show', view==='topics'); document.querySelector('.right-col')?.classList.toggle('show', view==='detail'); } }
+      function openMobileDetail(){ if (!isMobile()) return; document.getElementById('mobile-detail-overlay').style.display='block'; state.mobileDetailOpen=true; }
+      function closeMobileDetail(){ const el=document.getElementById('mobile-detail-overlay'); if (el) el.style.display='none'; state.mobileDetailOpen=false; }
+      async function openLane(name){ state.lane=name; state.currentTopic=null; const rows=await api(`/api/lane/${name}?limit=200`); state.messages=rows; renderMessages(); }
+      function renderTopics(){ const el=document.getElementById('topics'); if (!el) return; el.innerHTML=''; const lanes=[['waiting','Waiting on others'],['decision','Needs decision'],['reply','Reply now'],['noise','Noise']]; lanes.forEach(([key,label])=>{ const node=document.createElement('button'); node.className='topic-chip secondary'; node.onclick=()=>openLane(key); node.innerHTML=`<span>${label}</span>`; el.appendChild(node); }); }
+      function attachSwipe(card, messageId){ if (!window.PointerEvent || !window.matchMedia('(pointer: coarse)').matches) return; let startX=0,startY=0,dx=0,dy=0,locked=false,aborted=false; const threshold=Math.min(96, Math.max(64, card.offsetWidth*0.24)); const reset=()=>{ card.style.transform='translate3d(0,0,0)'; card.style.opacity='1'; card.parentElement.querySelector('.message-bg').style.opacity='0'; locked=false; aborted=false; dx=0; dy=0; };
+        card.onpointerdown=(e)=>{ if (!e.isPrimary) return; startX=e.clientX; startY=e.clientY; dx=0; dy=0; locked=false; aborted=false; card.setPointerCapture?.(e.pointerId); };
+        card.onpointermove=(e)=>{ if (aborted) return; dx=e.clientX-startX; dy=e.clientY-startY; if (!locked) { if (Math.abs(dy)>8 && Math.abs(dy)>Math.abs(dx)) { aborted=true; return; } if (Math.abs(dx)>12 && Math.abs(dx)>Math.abs(dy)*1.25) locked=true; }
+          if (!locked) return; if (dx>0) dx=0; const clamped=Math.max(dx, -120); card.style.transform=`translate3d(${clamped}px,0,0)`; card.style.opacity=`${Math.max(.84, 1-Math.abs(clamped)/300)}`; const bg=card.parentElement.querySelector('.message-bg'); bg.style.opacity = Math.min(1, Math.abs(clamped)/40).toString(); };
+        card.onpointerup=async()=>{ if (!locked || aborted) { reset(); return; } if (Math.abs(dx)>=threshold) { card.style.transform='translate3d(-120%,0,0)'; await archiveSelected([messageId]); } reset(); };
+        card.onpointercancel=reset;
       }
-      function renderRepeatSenders(rows){ const box=document.getElementById('repeat-senders'); if(!box) return; box.innerHTML = rows.map(r => `<div class="sender-card"><div class="sender-head"><div><div class="title">${escapeHtml(r.sender || '')}</div><div class="meta">${r.message_count || 0} messages · ${r.archived_count || 0} archived</div></div><span class="badge">noise ${Number(r.total_noise || 0)}</span></div><div class="spacer"></div><div class="toolbar"><button class="secondary" onclick="showSender('${escapeHtml(r.sender || '')}')">View sender</button><button onclick="archiveSender('${escapeHtml(r.sender || '')}')">Archive all</button></div></div>`).join('') || '<div class="small">No repeat senders yet.</div>'; }
-      async function loadRepeatSenders(){ try{ const rows=await api('/api/repeat-senders?min_count=2&limit=25'); state.repeatSenders=rows; renderRepeatSenders(rows); }catch(e){ ui.error(String(e.message||e)); } }
-      async function showSender(sender){ try{ setBusy('Loading sender…'); const rows=await api('/api/sender/'+encodeURIComponent(sender)+'?limit=100'); state.messages=rows; state.currentTopic=null; state.topics=[]; renderTopics(); renderMessages(); setView('messages'); clearBusy('Ready'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      async function archiveSender(sender){ try{ setBusy('Archiving sender…'); const res=await api('/api/bulk_archive_sender',{method:'POST',body:JSON.stringify({sender,limit:100})}); clearBusy(`Archived ${res.archived} messages from ${sender}`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      function renderBriefing(payload){ const box=document.getElementById('briefing'); const top=payload.top_messages||[]; const actions=payload.action_items||[]; box.innerHTML=`<div class="kpis"><div><div class="num">${top.length}</div><div class="label">Top messages</div></div><div><div class="num">${actions.length}</div><div class="label">Action items</div></div><div><div class="num">${state.messages.length}</div><div class="label">Loaded</div></div></div><div class="spacer"></div><div class="section-title">Briefing</div><div class="stack">${top.slice(0,5).map(m=>`<div class="small"><strong>${escapeHtml(m.subject||'(no subject)')}</strong><br/>${escapeHtml(m.sender)} · ${escapeHtml(m.cluster_label||'')} · ${escapeHtml(m.suggested_action||'')}</div>`).join('')||'<div class="small">No messages yet.</div>'}</div><div class="spacer"></div><div class="section-title">Action items</div><div class="stack">${actions.slice(0,6).map(a=>`<div class="small">• ${escapeHtml(a.item)}<br/><span class="muted">${escapeHtml(a.subject||'')}</span></div>`).join('')||'<div class="small">No action items yet.</div>'}</div>`; }
-      async function loadAll(){ try{ ui.error(''); const [status,messages,topics,briefing,repeats]=await Promise.all([api('/api/status'), api('/api/messages?include_archived=false&limit=200'), api('/api/topics?include_archived=false&limit=50'), api('/api/briefing?limit=10'), api('/api/repeat-senders?min_count=2&limit=25')]); state.status=status; state.messages=messages; state.topics=topics; state.currentTopic=null; state.lane=null; state.repeatSenders=repeats; renderStatus(status); renderTopics(); renderMessages(); renderBriefing(briefing); renderRepeatSenders(repeats); }catch(e){ ui.error(String(e.message||e)); } }
-      async function syncNow(){ try{ setBusy('Syncing Gmail…'); const maxInput=document.getElementById('max'); const max=maxInput ? maxInput.value : '40'; const res=await api('/api/sync',{method:'POST',body:JSON.stringify({max_results:Number(max), query:'in:anywhere -in:spam -in:trash'})}); clearBusy(`Synced ${res.synced} messages · newest first`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      function renderMessages(){ const rows=(state.messages||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date)); const container=document.getElementById('messages'); container.innerHTML=''; rows.forEach(m=>{ const shell=document.createElement('div'); shell.className='message-shell'; const bClass=badgeClass(m.actionability_score||0); shell.innerHTML=`<div class="message-bg">Archive</div><article class="message-card"><div class="message-head"><div><div class="title">${escapeHtml(m.subject||'(no subject)')}</div><div class="meta">${escapeHtml(m.sender)} · ${escapeHtml((new Date(m.date)).toLocaleString())}</div></div><span class="${bClass}">score ${Number(m.actionability_score||0)}</span></div><div class="spacer"></div><div class="thread-preview">${escapeHtml(m.summary||m.snippet||'')}</div><div class="spacer"></div><div class="toggle-row"><span class="badge">${escapeHtml(m.intent||'unknown')}</span>${m.unsubscribe_url ? '<span class="badge">unsubscribe</span>' : ''}${m.noise_score>=2 ? '<span class="badge">noise</span>' : ''}</div><div class="spacer"></div><div class="toolbar"><button class="secondary" onclick="openDetail('${m.id}')">Open</button><button onclick="archiveSelected(['${m.id}'])">Archive</button><button class="secondary" onclick="draftReply('${m.id}')">Draft</button></div></article>`; container.appendChild(shell); attachSwipe(shell.querySelector('.message-card'), m.id); }); }
+      function renderBriefing(payload){ const box=document.getElementById('briefing'); if (!box) return; const top=payload.top_messages||[]; const actions=payload.action_items||[]; box.innerHTML=`<div class="briefing"><div class="kpis"><div><div class="num">${top.length}</div><div class="small">Top messages</div></div><div><div class="num">${actions.length}</div><div class="small">Action items</div></div><div><div class="num">${state.messages.length}</div><div class="small">Loaded</div></div></div><div class="spacer"></div><div class="section-title">Briefing</div><div class="stack">${top.slice(0,5).map(m=>`<div class="small"><strong>${escapeHtml(m.subject||'(no subject)')}</strong><br/>${escapeHtml(m.sender)}</div>`).join('')||'<div class="small">No messages yet.</div>'}</div></div>`; }
+      function renderRepeatSenders(rows){ const box=document.getElementById('repeat-senders'); if(!box) return; box.innerHTML = rows.map(r=>`<div class="sender-card"><div class="sender-head"><div><div class="title">${escapeHtml(r.sender||'')}</div><div class="meta">${r.message_count||0} messages</div></div><span class="badge">noise ${Number(r.total_noise||0)}</span></div><div class="spacer"></div><div class="toolbar"><button class="secondary" onclick="showSender('${escapeHtml(r.sender||'')}')">View</button><button onclick="archiveSender('${escapeHtml(r.sender||'')}')">Archive all</button></div></div>`).join('') || '<div class="small">No repeat senders yet.</div>'; }
+      async function loadAll(){ try{ ui.error(''); const [status,messages,briefing,repeats]=await Promise.all([api('/api/status'), api('/api/messages?include_archived=false&limit=200'), api('/api/briefing?limit=10'), api('/api/repeat-senders?min_count=2&limit=25')]); state.status=status; state.messages=messages; state.repeatSenders=repeats; renderStatus(status); renderTopics(); renderMessages(); renderBriefing(briefing); renderRepeatSenders(repeats); }catch(e){ ui.error(String(e.message||e)); } }
+      async function syncNow(){ try{ setBusy('Syncing Gmail…'); const res=await api('/api/sync',{method:'POST',body:JSON.stringify({max_results:40, query:'in:anywhere -in:spam -in:trash'})}); clearBusy(`Synced ${res.synced} messages`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
       async function bootstrapNow(){ try{ setBusy('Bootstrapping mailbox…'); const res=await api('/api/bootstrap',{method:'POST'}); clearBusy(`Bootstrapped ${res.synced} messages`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      async function searchNow(){ try{ setBusy('Searching…'); const q=document.getElementById('search').value; const rows=await api('/api/search?'+new URLSearchParams({q,k:'20'})); state.messages=rows; state.currentTopic=null; state.topics=[]; renderTopics(); renderMessages(); setView('messages'); clearBusy(`Showing ${rows.length} results`); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      function selectedIds(){ return [...document.querySelectorAll('input[type=checkbox][data-id]:checked')].map(el=>el.dataset.id); }
-      async function archiveSelected(idsOverride=null){ try{ const ids=idsOverride||selectedIds(); if(!ids.length) return; setBusy(`Archiving ${ids.length} messages…`); await api('/api/archive',{method:'POST',body:JSON.stringify({message_ids:ids})}); clearBusy(`Archived ${ids.length} messages`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      async function archiveByQuery(){ try{ setBusy('Archiving by query…'); const q=document.getElementById('bulkQuery').value; const limit=document.getElementById('bulkLimit').value||'30'; const res=await api('/api/bulk_archive_by_query',{method:'POST',body:JSON.stringify({query:q,limit:Number(limit)})}); clearBusy(`Archived ${res.archived} messages by query`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      async function analyzeMessage(id){ try{ setBusy('Analyzing message…'); const res=await api('/api/analyze',{method:'POST',body:JSON.stringify({message_id:id})}); document.getElementById(`analysis-${id}`).innerText=`intent=${res.intent} · action=${res.suggested_action} · noise=${res.noise_score}`; clearBusy('Ready'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      async function openDetail(id){ try{ setBusy('Loading message…'); const res=await api(`/api/message/${id}`); const box=document.getElementById('detail'); box.innerHTML=`<div class="detail-head"><div><div class="section-title">Decision detail</div><div class="title">${escapeHtml(res.subject||'(no subject)')}</div><div class="meta">${escapeHtml(res.sender||'')}</div></div><span class="badge">${escapeHtml(res.intent||'')}</span></div><div class="spacer"></div><div class="small"><strong>Summary:</strong> ${escapeHtml(res.summary||'')}</div><div class="small"><strong>Cluster:</strong> ${escapeHtml(res.cluster_label||'')}</div><div class="small"><strong>Action:</strong> ${escapeHtml(res.suggested_action||'')}</div><div class="small"><strong>Actionability:</strong> ${escapeHtml(String(res.actionability_score??''))}</div><div class="small"><strong>Noise:</strong> ${escapeHtml(String(res.noise_score??''))}</div><div class="small"><strong>Reasons:</strong> ${escapeHtml((res.reason_codes||[]).join(', '))}</div>${res.unsubscribe_url ? `<div class=\"spacer\"></div><div class=\"toolbar\"><button onclick=\"openUnsubscribe('` + escapeHtml(res.unsubscribe_url) + `')\">Open unsubscribe</button></div>` : ''}<div class="spacer"></div><div class="section-title">Draft reply</div><div class="small" style="white-space:pre-wrap">${escapeHtml(res.draft_reply||'')}</div><div class="spacer"></div><div class="section-title">Action items</div><div class="stack">${(res.action_items||[]).map(a=>`<div class="small">• ${escapeHtml(a.item)}</div>`).join('')||'<div class="small">None</div>'}</div>`; setView('detail'); clearBusy('Ready'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      async function draftReply(id){ try{ const tone=prompt('Tone? concise / warm / firm / boundary','concise')||'concise'; const res=await api('/api/draft_reply',{method:'POST',body:JSON.stringify({message_id:id,tone})}); document.getElementById('detail').innerHTML=`<div class="section-title">Draft reply</div><div class="small" style="white-space:pre-wrap">${escapeHtml(res.draft)}</div>`; setView('detail'); clearBusy('Ready'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
-      function setBusy(label){ state.busy=true; state.busyLabel=label||'Working…'; document.getElementById('status').innerText=state.busyLabel; document.querySelectorAll('button').forEach(btn=>btn.disabled=true); }
-      function clearBusy(statusText){ state.busy=false; state.busyLabel=''; document.querySelectorAll('button').forEach(btn=>btn.disabled=false); if (statusText) document.getElementById('status').innerText=statusText; }
-      async function login(){ try{ setBusy('Opening Gmail login…'); const r=await api('/auth/login'); if(r.auth_url) window.location=r.auth_url; else clearBusy('Login started'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function searchNow(){ try{ setBusy('Searching…'); const q=document.getElementById('search').value; const rows=await api('/api/search?'+new URLSearchParams({q,k:'20'})); state.messages=rows; renderMessages(); clearBusy(`Showing ${rows.length} results`); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function archiveSelected(ids){ try{ if(!ids?.length) return; setBusy(`Archiving ${ids.length}…`); await api('/api/archive',{method:'POST',body:JSON.stringify({message_ids:ids})}); clearBusy(`Archived ${ids.length}`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function archiveByQuery(){ try{ setBusy('Archiving by query…'); const q=document.getElementById('bulkQuery').value; const limit=document.getElementById('bulkLimit').value||'30'; const res=await api('/api/bulk_archive_by_query',{method:'POST',body:JSON.stringify({query:q,limit:Number(limit)})}); clearBusy(`Archived ${res.archived}`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function showSender(sender){ try{ setBusy('Loading sender…'); const rows=await api('/api/sender/'+encodeURIComponent(sender)+'?limit=100'); state.messages=rows; renderMessages(); clearBusy(`Showing ${rows.length} from ${sender}`); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function archiveSender(sender){ try{ setBusy('Archiving sender…'); const res=await api('/api/bulk_archive_sender',{method:'POST',body:JSON.stringify({sender,limit:100})}); clearBusy(`Archived ${res.archived} from ${sender}`); await loadAll(); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function openDetail(id){ try{ setBusy('Loading message…'); const res=await api('/api/message/'+id); const inner=`<div class="sheet-top"><div><div class="section-title">Thread</div><div class="title">${escapeHtml(res.subject||'(no subject)')}</div><div class="meta">${escapeHtml(res.sender||'')}</div></div><button class="secondary" onclick="closeMobileDetail()">Close</button></div><div class="spacer"></div><div class="small"><strong>Summary:</strong> ${escapeHtml(res.summary||'')}</div><div class="small"><strong>Intent:</strong> ${escapeHtml(res.intent||'')}</div><div class="small"><strong>Action:</strong> ${escapeHtml(res.suggested_action||'')}</div>${res.unsubscribe_url ? `<div class="spacer"></div><div class="toolbar"><button onclick="openUnsubscribe('${escapeHtml(res.unsubscribe_url)}')">Open unsubscribe</button></div>` : ''}<div class="spacer"></div><div class="section-title">Draft reply</div><div class="small" style="white-space:pre-wrap">${escapeHtml(res.draft_reply||'')}</div><div class="spacer"></div><div class="section-title">Action items</div><div class="stack">${(res.action_items||[]).map(a=>`<div class="small">• ${escapeHtml(a.item)}</div>`).join('')||'<div class="small">None</div>'}</div>`;
+        document.getElementById('detail').innerHTML = inner; document.getElementById('mobile-detail-content').innerHTML = inner; if (isMobile()) openMobileDetail(); clearBusy('Ready'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
+      async function draftReply(id){ try{ setBusy('Drafting reply…'); const tone=prompt('Tone? concise / warm / firm / boundary','concise')||'concise'; const res=await api('/api/draft_reply',{method:'POST',body:JSON.stringify({message_id:id,tone})}); const html=`<div class="sheet-top"><div><div class="section-title">Draft reply</div></div><button class="secondary" onclick="closeMobileDetail()">Close</button></div><div class="small" style="white-space:pre-wrap">${escapeHtml(res.draft)}</div>`; document.getElementById('detail').innerHTML=html; document.getElementById('mobile-detail-content').innerHTML=html; if (isMobile()) openMobileDetail(); clearBusy('Ready'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
       function openUnsubscribe(url){ window.open(url, '_blank', 'noopener'); }
-      function showPane(view) { document.querySelectorAll('.left-col, .right-col').forEach(el => el.classList.remove('show')); if (view === 'topics') document.querySelector('.left-col').classList.add('show'); if (view === 'detail') document.querySelector('.right-col').classList.add('show'); if (view === 'messages') setView('messages'); }
+      async function login(){ try{ setBusy('Opening Gmail login…'); const r=await api('/auth/login'); if(r.auth_url) window.location=r.auth_url; else clearBusy('Login started'); }catch(e){ clearBusy('Ready'); ui.error(String(e.message||e)); } }
       window.addEventListener('DOMContentLoaded', loadAll);
     </script>
   </head>
   <body>
     <div class="shell">
-      <div class="topbar"><div><h1>Gmail Intelligence Tool</h1><div class="sub">Decision-first inbox · semantic grouping · action extraction</div></div><div id="status" class="status-chip">Ready</div></div>
+      <div class="topbar"><div><h1>Gmail Intelligence Tool</h1><div class="sub">Inbox triage, repeat sender cleanup, unsubscribe help</div></div><div id="status" class="status-chip">Ready</div></div>
       <div id="error" class="error"></div>
-      <div class="grid hero-card card">
+      <div class="card stack">
         <div class="section-title">Quick actions</div>
         <div class="row">
           <button onclick="login()">Authenticate Gmail</button>
@@ -121,45 +122,24 @@
       </div>
       <div class="layout" style="margin-top:12px">
         <aside class="left-col stack">
-          <section class="card" data-view="topics">
-            <div class="section-title">Lanes</div>
-            <div class="lane-list">
-              <button class="secondary lane-chip" onclick="openLane('waiting')"><span>Waiting on others</span><span class="badge">lane</span></button>
-              <button class="secondary lane-chip" onclick="openLane('decision')"><span>Needs decision</span><span class="badge">lane</span></button>
-              <button class="secondary lane-chip" onclick="openLane('reply')"><span>Reply now</span><span class="badge">lane</span></button>
-              <button class="secondary lane-chip" onclick="openLane('noise')"><span>Noise</span><span class="badge">lane</span></button>
-            </div>
-          </section>
-          <section class="card" data-view="topics">
-            <div class="section-title">Topics</div>
-            <div id="topics" class="topic-list"></div>
-          </section>
-          <section class="card" data-view="topics">
-            <div class="section-title">Repeat senders</div>
-            <div id="repeat-senders" class="sender-list"></div>
-          </section>
+          <section class="card"><div class="section-title">Filters</div><div id="topics" class="topic-list"></div></section>
+          <section class="card"><div class="section-title">Repeat senders</div><div id="repeat-senders" class="sender-list"></div></section>
         </aside>
         <main class="center-col stack">
-          <section class="card search-wrap">
+          <section class="card">
             <div class="section-title">Search & archive</div>
-            <div class="row">
-              <input id="search" placeholder="Search by meaning, sender, subject..." />
-              <button class="secondary" onclick="searchNow()">Search</button>
-            </div>
-            <div class="row">
-              <input id="bulkQuery" value="in:anywhere -in:spam -in:trash" />
-              <input id="bulkLimit" type="number" value="30" min="1" style="max-width:130px" />
-              <button class="secondary" onclick="archiveByQuery()">Archive by query</button>
-            </div>
+            <div class="row"><input id="search" placeholder="Search by meaning, sender, subject..." /><button class="secondary" onclick="searchNow()">Search</button></div>
+            <div class="row"><input id="bulkQuery" value="in:anywhere -in:spam -in:trash" /><input id="bulkLimit" type="number" value="30" min="1" style="max-width:130px" /><button class="secondary" onclick="archiveByQuery()">Archive by query</button></div>
           </section>
-          <section class="card"><div class="section-title">Messages</div><div id="messages" class="message-list"></div></section>
+          <section class="card"><div class="section-title">Inbox</div><div id="messages" class="message-list"></div></section>
         </main>
         <aside class="right-col stack">
-          <section class="card" data-view="detail"><div id="detail" class="detail-card"><div class="section-title">Decision detail</div><div class="small">Select a message to inspect summary, intent, suggested action, and draft reply.</div></div></section>
-          <section class="card" data-view="messages"><div id="briefing"></div></section>
+          <section class="card"><div id="detail" class="detail-card"><div class="section-title">Thread detail</div><div class="small">Tap a message to open it.</div></div></section>
+          <section class="card"><div id="briefing"></div></section>
         </aside>
       </div>
     </div>
-    <div class="bottom-nav"><div class="nav-inner"><button class="secondary" onclick="showPane('topics')">Topics</button><button class="secondary" onclick="showPane('messages')">Messages</button><button class="secondary" onclick="showPane('detail')">Detail</button><button class="secondary" onclick="loadAll()">Refresh</button></div></div>
+    <div id="mobile-detail-overlay" class="mobile-detail-overlay"><div class="mobile-detail-sheet" id="mobile-detail-content"></div></div>
+    <div class="bottom-nav"><div class="nav-inner"><button class="secondary" onclick="document.querySelector('.left-col')?.classList.toggle('show')">Filters</button><button class="secondary" onclick="closeMobileDetail()">Inbox</button><button class="secondary" onclick="openLane('noise')">Noise</button><button class="secondary" onclick="loadAll()">Refresh</button></div></div>
   </body>
 </html>
