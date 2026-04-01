@@ -299,6 +299,7 @@ class MessageStore:
 
     def _row_to_dict(self, row):
         rec = dict(row)
+        rec.pop("embedding", None)
         rec["labels"] = json.loads(rec["labels"]) if rec.get("labels") else []
         rec["reason_codes"] = json.loads(rec["reason_codes"]) if rec.get("reason_codes") else []
         rec["is_archived"] = bool(rec["is_archived"])
