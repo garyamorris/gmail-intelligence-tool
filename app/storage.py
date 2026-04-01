@@ -69,6 +69,9 @@ class MessageStore:
             CREATE INDEX IF NOT EXISTS idx_messages_thread_id
             ON messages (thread_id);
 
+            CREATE INDEX IF NOT EXISTS idx_messages_sender
+            ON messages (sender);
+
             CREATE TABLE IF NOT EXISTS action_items (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               message_id TEXT NOT NULL,
@@ -225,6 +228,33 @@ class MessageStore:
         q += " GROUP BY cluster_label ORDER BY latest_date DESC LIMIT ?"
         rows = self.conn.execute(q, (limit,)).fetchall()
         return [dict(r) for r in rows]
+
+    def list_repeat_senders(self, include_archived: bool = False, min_count: int = 2, limit: int = 25):
+        q = """
+        SELECT sender,
+               COUNT(*) as message_count,
+               SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as archived_count,
+               MAX(date) as latest_date,
+               SUM(actionability_score) as total_actionability,
+               SUM(noise_score) as total_noise
+        FROM messages
+        """
+        clauses = []
+        if not include_archived:
+            clauses.append("is_archived = 0")
+        if clauses:
+            q += " WHERE " + " AND ".join(clauses)
+        q += " GROUP BY sender HAVING COUNT(*) >= ? ORDER BY latest_date DESC LIMIT ?"
+        rows = self.conn.execute(q, (min_count, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def messages_by_sender(self, sender: str, include_archived: bool = False, limit: int = 100):
+        q = "SELECT * FROM messages WHERE sender = ?"
+        if not include_archived:
+            q += " AND is_archived = 0"
+        q += " ORDER BY datetime(date) DESC LIMIT ?"
+        rows = self.conn.execute(q, (sender, limit)).fetchall()
+        return [self._row_to_dict(r) for r in rows]
 
     def recent_briefing(self, limit: int = 10):
         rows = self.conn.execute(

@@ -142,6 +142,16 @@ def topics_api(limit: int = 50, include_archived: bool = False):
     return store.list_topics(include_archived=include_archived, limit=limit)
 
 
+@app.get("/api/repeat-senders")
+def repeat_senders_api(min_count: int = 2, limit: int = 25, include_archived: bool = False):
+    return store.list_repeat_senders(include_archived=include_archived, min_count=min_count, limit=limit)
+
+
+@app.get("/api/sender/{sender}")
+def sender_messages_api(sender: str, limit: int = 100, include_archived: bool = False):
+    return store.messages_by_sender(sender=sender, include_archived=include_archived, limit=limit)
+
+
 @app.get("/api/briefing")
 def briefing_api(limit: int = 10):
     return {
@@ -197,10 +207,7 @@ def sync_api(payload: dict):
         synced = _sync_messages(max_results=max_results, query=query)
         return {"synced": synced, "query": query}
     except Exception as exc:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(exc), "trace": traceback.format_exc(limit=6)},
-        )
+        return JSONResponse(status_code=500, content={"error": str(exc), "trace": traceback.format_exc(limit=6)})
 
 
 @app.post("/api/bootstrap")
@@ -239,6 +246,22 @@ def bulk_archive_by_query(payload: dict):
     return {"archived": archived, "message_ids": ids}
 
 
+@app.post("/api/bulk_archive_sender")
+def bulk_archive_sender(payload: dict):
+    sender = payload.get("sender", "")
+    if not sender:
+        raise HTTPException(status_code=400, detail="sender required")
+    limit = int(payload.get("limit", 100))
+    rows = store.messages_by_sender(sender=sender, include_archived=False, limit=limit)
+    ids = [r["id"] for r in rows]
+    if not ids:
+        return {"archived": 0, "sender": sender}
+    svc = build_gmail_service(str(config.token_path), config.client_secrets_file)
+    archived = archive_messages(svc, message_ids=ids)
+    store.set_archived(ids, True)
+    return {"archived": archived, "sender": sender, "message_ids": ids}
+
+
 @app.post("/api/draft_reply")
 def draft_reply_api(payload: dict):
     message_id = payload.get("message_id")
@@ -273,10 +296,7 @@ def auth_login(mode: str = "json"):
 
     raw = path.read_text(encoding="utf-8").strip()
     if not raw or raw == "{}":
-        raise HTTPException(
-            status_code=400,
-            detail="OAuth client secret is empty placeholder. Replace gmail-client-secrets-json with a real Google OAuth client_secret.json",
-        )
+        raise HTTPException(status_code=400, detail="OAuth client secret is empty placeholder. Replace gmail-client-secrets-json with a real Google OAuth client_secret.json")
 
     try:
         payload = json.loads(raw)
@@ -284,10 +304,7 @@ def auth_login(mode: str = "json"):
         raise HTTPException(status_code=400, detail="GMAIL_CLIENT_SECRETS is not valid JSON")
 
     if not payload.get("installed") and not payload.get("web"):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OAuth client type. Create a Web or Installed app client in Google Cloud OAuth credentials.",
-        )
+        raise HTTPException(status_code=400, detail="Invalid OAuth client type. Create a Web or Installed app client in Google Cloud OAuth credentials.")
 
     try:
         auth_url = get_google_auth_url(config.client_secrets_file, config.redirect_uri)
@@ -295,10 +312,7 @@ def auth_login(mode: str = "json"):
             return RedirectResponse(url=auth_url, status_code=302)
         return {"auth_url": auth_url}
     except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create auth URL from client secret: {exc}",
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create auth URL from client secret: {exc}")
 
 
 @app.get("/auth/start")
