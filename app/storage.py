@@ -82,6 +82,13 @@ class MessageStore:
               created_at TEXT NOT NULL,
               FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS sender_preferences (
+              sender TEXT PRIMARY KEY,
+              classification TEXT NOT NULL DEFAULT '',
+              note TEXT NOT NULL DEFAULT '',
+              updated_at TEXT NOT NULL
+            );
             """
         )
         self.conn.commit()
@@ -242,24 +249,212 @@ class MessageStore:
         rows = self.conn.execute(q, (limit,)).fetchall()
         return [dict(r) for r in rows]
 
+    def _sender_unsubscribe_links(self, sender: str, include_archived: bool = True, limit: int = 5):
+        q = "SELECT DISTINCT unsubscribe_url FROM messages WHERE sender = ? AND unsubscribe_url != ''"
+        params = [sender]
+        if not include_archived:
+            q += " AND is_archived = 0"
+        q += " ORDER BY unsubscribe_url LIMIT ?"
+        params.append(limit)
+        rows = self.conn.execute(q, params).fetchall()
+        return [r["unsubscribe_url"] for r in rows]
+
+    def _sender_primary_cluster(self, sender: str, include_archived: bool = True):
+        q = """
+        SELECT cluster_label, COUNT(*) as message_count, MAX(date) as latest_date
+        FROM messages
+        WHERE sender = ?
+        """
+        params = [sender]
+        if not include_archived:
+            q += " AND is_archived = 0"
+        q += """
+        GROUP BY cluster_label
+        ORDER BY message_count DESC, datetime(latest_date) DESC
+        LIMIT 1
+        """
+        return self.conn.execute(q, params).fetchone()
+
+    def _sender_recent_subjects(self, sender: str, include_archived: bool = True, limit: int = 3):
+        q = "SELECT subject FROM messages WHERE sender = ?"
+        params = [sender]
+        if not include_archived:
+            q += " AND is_archived = 0"
+        q += " ORDER BY datetime(date) DESC LIMIT ?"
+        params.append(limit)
+        rows = self.conn.execute(q, params).fetchall()
+        subjects: list[str] = []
+        for row in rows:
+            subject = (row["subject"] or "").strip()
+            if subject and subject not in subjects:
+                subjects.append(subject)
+        return subjects
+
+    def set_sender_classification(self, sender: str, classification: str, note: str = ""):
+        updated_at = datetime.utcnow().isoformat()
+        self.conn.execute(
+            """
+            INSERT INTO sender_preferences (sender, classification, note, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(sender) DO UPDATE SET
+              classification=excluded.classification,
+              note=excluded.note,
+              updated_at=excluded.updated_at
+            """,
+            (sender, classification, note, updated_at),
+        )
+        self.conn.commit()
+
+    def get_sender_preferences(self, senders: Iterable[str]):
+        sender_list = [sender for sender in senders if sender]
+        if not sender_list:
+            return {}
+        placeholder = ",".join(["?"] * len(sender_list))
+        rows = self.conn.execute(
+            f"SELECT sender, classification, note, updated_at FROM sender_preferences WHERE sender IN ({placeholder})",
+            sender_list,
+        ).fetchall()
+        return {row["sender"]: dict(row) for row in rows}
+
+    def _junk_signal_rollup(self, sender_row: dict):
+        avg_noise = float(sender_row.get("avg_noise_score") or 0.0)
+        avg_actionability = float(sender_row.get("avg_actionability_score") or 0.0)
+        message_count = int(sender_row.get("message_count") or 0)
+        active_count = int(sender_row.get("active_count") or 0)
+        archived_count = int(sender_row.get("archived_count") or 0)
+        unsubscribe_link_count = int(sender_row.get("unsubscribe_link_count") or 0)
+
+        signals: list[str] = []
+        if message_count >= 5:
+            signals.append(f"{message_count} stored messages")
+        if avg_noise >= 1.5:
+            signals.append(f"avg noise {avg_noise:.1f}")
+        if unsubscribe_link_count > 0:
+            signals.append(f"{unsubscribe_link_count} unsubscribe links")
+        if archived_count > 0:
+            signals.append(f"{archived_count} already archived")
+        if active_count >= 5:
+            signals.append(f"{active_count} still active")
+
+        score = min(30.0, message_count * 2.0)
+        score += min(25.0, avg_noise * 8.0)
+        score += min(20.0, unsubscribe_link_count * 10.0)
+        score += min(15.0, archived_count * 1.2)
+        score -= min(20.0, avg_actionability * 6.0)
+        return round(max(0.0, score), 1), signals
+
+    def _classify_repeat_sender(self, sender_row: dict, manual_classification: str = ""):
+        avg_noise = float(sender_row.get("avg_noise_score") or 0.0)
+        avg_actionability = float(sender_row.get("avg_actionability_score") or 0.0)
+        unsubscribe_link_count = int(sender_row.get("unsubscribe_link_count") or 0)
+        active_count = int(sender_row.get("active_count") or 0)
+        archived_count = int(sender_row.get("archived_count") or 0)
+        junk_score = float(sender_row.get("junk_score") or 0.0)
+
+        if manual_classification == "junk":
+            return (
+                "junk-sender",
+                "Marked as junk manually. Treat this sender as bulk clutter.",
+            )
+        if junk_score >= 45:
+            return (
+                "junk-suspect",
+                "Heavy repeat volume with strong junk signals across the mailbox.",
+            )
+
+        if unsubscribe_link_count > 0 and avg_noise >= 1.5:
+            return (
+                "subscription-heavy",
+                "Recurring sender with unsubscribe links and mostly low-signal mail.",
+            )
+        if avg_actionability >= 2.5 and avg_actionability > avg_noise:
+            return (
+                "priority-repeat",
+                "Recurring sender with a higher concentration of actionable mail.",
+            )
+        if archived_count > active_count and avg_noise >= 1.0:
+            return (
+                "mostly-cleared",
+                "Historically noisy sender that is already mostly archived.",
+            )
+        if unsubscribe_link_count > 0:
+            return (
+                "marketing-or-updates",
+                "Recurring sender with unsubscribe options and mixed importance.",
+            )
+        return (
+            "mixed-repeat",
+            "Recurring sender with mixed signal across the mailbox.",
+        )
+
     def list_repeat_senders(self, include_archived: bool = False, min_count: int = 2, limit: int = 25):
         q = """
         SELECT sender,
                COUNT(*) as message_count,
+               SUM(CASE WHEN is_archived = 0 THEN 1 ELSE 0 END) as active_count,
                SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as archived_count,
+               COUNT(DISTINCT thread_id) as thread_count,
                MAX(date) as latest_date,
                SUM(actionability_score) as total_actionability,
-               SUM(noise_score) as total_noise
+               SUM(noise_score) as total_noise,
+               AVG(actionability_score) as avg_actionability_score,
+               AVG(noise_score) as avg_noise_score,
+               COUNT(DISTINCT CASE WHEN unsubscribe_url != '' THEN unsubscribe_url END) as unsubscribe_link_count,
+               MAX(CASE WHEN unsubscribe_url != '' THEN unsubscribe_url END) as unsubscribe_url
         FROM messages
         """
         clauses = []
+        clauses.append("sender != ''")
         if not include_archived:
             clauses.append("is_archived = 0")
         if clauses:
             q += " WHERE " + " AND ".join(clauses)
-        q += " GROUP BY sender HAVING COUNT(*) >= ? ORDER BY latest_date DESC LIMIT ?"
+        q += " GROUP BY sender HAVING COUNT(*) >= ? ORDER BY message_count DESC, datetime(latest_date) DESC LIMIT ?"
         rows = self.conn.execute(q, (min_count, limit)).fetchall()
-        return [dict(r) for r in rows]
+        preferences = self.get_sender_preferences([row["sender"] for row in rows])
+        senders = []
+        for row in rows:
+            sender_row = dict(row)
+            preference = preferences.get(sender_row["sender"], {})
+            sender_row["avg_actionability_score"] = round(float(sender_row.get("avg_actionability_score") or 0.0), 2)
+            sender_row["avg_noise_score"] = round(float(sender_row.get("avg_noise_score") or 0.0), 2)
+            sender_row["unsubscribe_links"] = self._sender_unsubscribe_links(sender_row["sender"], include_archived=include_archived)
+            primary_cluster = self._sender_primary_cluster(sender_row["sender"], include_archived=include_archived)
+            sender_row["primary_cluster"] = primary_cluster["cluster_label"] if primary_cluster else ""
+            sender_row["recent_subjects"] = self._sender_recent_subjects(sender_row["sender"], include_archived=include_archived)
+            junk_score, junk_signals = self._junk_signal_rollup(sender_row)
+            sender_row["junk_score"] = junk_score
+            sender_row["junk_signals"] = junk_signals
+            sender_row["manual_classification"] = preference.get("classification", "")
+            sender_row["manual_note"] = preference.get("note", "")
+            category, reason = self._classify_repeat_sender(
+                sender_row,
+                manual_classification=sender_row["manual_classification"],
+            )
+            sender_row["sender_category"] = category
+            sender_row["sender_reason"] = reason
+            sender_row["sort_score"] = round(
+                float(sender_row["message_count"])
+                + float(sender_row["active_count"]) * 0.4
+                + float(sender_row["unsubscribe_link_count"]) * 2.0
+                + float(sender_row["avg_noise_score"]) * 1.5,
+                2,
+            )
+            if sender_row["manual_classification"] == "junk":
+                sender_row["sort_score"] += 25
+            else:
+                sender_row["sort_score"] += sender_row["junk_score"] * 0.35
+            senders.append(sender_row)
+
+        senders.sort(
+            key=lambda row: (
+                row.get("sort_score", 0),
+                row.get("message_count", 0),
+                row.get("active_count", 0),
+            ),
+            reverse=True,
+        )
+        return senders
 
     def messages_by_sender(self, sender: str, include_archived: bool = False, limit: int = 100):
         q = "SELECT * FROM messages WHERE sender = ?"

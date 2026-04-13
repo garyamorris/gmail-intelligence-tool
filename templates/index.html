@@ -16,10 +16,12 @@
       .status-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--line); border-radius:999px; background:rgba(15,20,38,.75); color:var(--muted); font-size:12px; white-space:nowrap; max-width:48vw; overflow:hidden; text-overflow:ellipsis; }
       .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:14px; box-shadow:var(--shadow); }
       .section-title { font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:10px; }
-      .row, .toolbar, .stack { display:flex; gap:10px; flex-wrap:wrap; }
+      .row, .toolbar, .stack, .view-tabs, .sender-signals, .sender-links { display:flex; gap:10px; flex-wrap:wrap; }
       .stack { display:grid; gap:12px; }
+      .view-tabs { margin-top:8px; }
       button { appearance:none; border:0; border-radius:14px; padding:12px 14px; min-height:44px; cursor:pointer; font-weight:700; font-size:14px; background:linear-gradient(180deg,var(--accent),#4c62ff); color:white; }
       button.secondary { background:rgba(24,32,62,.95); border:1px solid var(--line); color:var(--text); }
+      .tab-button.active { background:linear-gradient(180deg,var(--accent),#4c62ff); color:white; border-color:transparent; }
       input { width:100%; min-height:46px; background:rgba(10,15,28,.94); border:1px solid var(--line); color:var(--text); padding:12px 14px; border-radius:14px; font-size:16px; }
       .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; background:rgba(110,124,255,.12); color:#cdd4ff; border:1px solid rgba(110,124,255,.25); }
       .badge.good { background:rgba(74,222,128,.10); color:#abf0c1; border-color:rgba(74,222,128,.2); }
@@ -28,7 +30,7 @@
       .error { display:none; margin:12px 0; padding:12px 14px; border-radius:14px; border:1px solid rgba(251,113,133,.35); background:rgba(251,113,133,.10); color:#fda4af; font-size:13px; white-space:pre-wrap; }
       .layout { display:grid; gap:12px; }
       .left-col, .center-col, .right-col { display:grid; gap:12px; }
-      .lane-list, .topic-list, .message-list, .sender-list { display:grid; gap:10px; }
+      .lane-list, .topic-list, .message-list, .sender-list, .sender-grid { display:grid; gap:10px; }
       .lane-chip, .topic-chip { text-align:left; width:100%; display:flex; justify-content:space-between; align-items:center; gap:10px; }
       .message-shell { position:relative; overflow:hidden; border-radius:16px; }
       .message-bg { position:absolute; inset:0; display:flex; justify-content:flex-end; align-items:center; padding:0 14px; background:rgba(251,113,133,.12); border:1px solid rgba(251,113,133,.24); border-radius:16px; color:#fda4af; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
@@ -41,9 +43,15 @@
       .toggle-row { display:flex; gap:8px; flex-wrap:wrap; }
       .briefing .kpis { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
       .briefing .kpis > div { background:rgba(18,25,48,.95); border:1px solid var(--line); border-radius:14px; padding:10px; }
+      .sender-summary { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; }
+      .sender-summary > div { background:rgba(18,25,48,.95); border:1px solid var(--line); border-radius:14px; padding:10px; }
+      .sender-summary strong { display:block; font-size:20px; font-weight:800; }
+      .sender-summary span { display:block; color:var(--muted); font-size:12px; margin-top:2px; }
+      .chip-link { display:inline-flex; align-items:center; min-height:36px; padding:8px 10px; border-radius:12px; text-decoration:none; background:rgba(24,32,62,.95); border:1px solid var(--line); color:var(--text); font-size:12px; font-weight:700; }
+      .empty-state { padding:14px; border-radius:14px; border:1px dashed rgba(150,165,216,.22); color:var(--muted); background:rgba(12,18,34,.72); font-size:13px; }
       .num { font-size:20px; font-weight:800; }
       .bottom-nav { position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(5,10,20,.86); backdrop-filter:blur(18px); border-top:1px solid rgba(38,50,92,.85); z-index:50; }
-      .bottom-nav .nav-inner { width:min(1280px,100%); margin:0 auto; display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+      .bottom-nav .nav-inner { width:min(1280px,100%); margin:0 auto; display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; }
       .mobile-detail-overlay { position:fixed; inset:0; background:rgba(4,8,16,.82); backdrop-filter:blur(6px); z-index:60; display:none; }
       .mobile-detail-sheet { position:absolute; inset:12px 12px calc(76px + env(safe-area-inset-bottom)) 12px; background:var(--panel); border:1px solid var(--line); border-radius:20px; overflow:auto; padding:14px; box-shadow:var(--shadow); }
       .sheet-top { display:flex; justify-content:space-between; align-items:center; gap:10px; position:sticky; top:0; background:linear-gradient(180deg,var(--panel),rgba(15,20,38,.94)); padding-bottom:10px; }
@@ -62,6 +70,7 @@
         .row, .toolbar { flex-direction:column; }
         .row button, .toolbar button { width:100%; }
         .briefing .kpis { grid-template-columns:1fr; }
+        .sender-summary { grid-template-columns:1fr 1fr; }
       }
     </style>
     <script>
@@ -127,11 +136,25 @@
         </aside>
         <main class="center-col stack">
           <section class="card">
+            <div class="section-title">Mailbox Views</div>
+            <div class="view-tabs">
+              <button id="tab-inbox" class="secondary tab-button active" onclick="setView('inbox')">Inbox</button>
+              <button id="tab-senders" class="secondary tab-button" onclick="setView('senders')">Repeat Senders</button>
+            </div>
+            <div class="small">Use repeat senders to rank junk-heavy senders, open unsubscribe links, and clear their mail in bulk.</div>
+          </section>
+          <section id="inbox-controls" class="card">
             <div class="section-title">Search & archive</div>
             <div class="row"><input id="search" placeholder="Search by meaning, sender, subject..." /><button class="secondary" onclick="searchNow()">Search</button></div>
             <div class="row"><input id="bulkQuery" value="in:anywhere -in:spam -in:trash" /><input id="bulkLimit" type="number" value="30" min="1" style="max-width:130px" /><button class="secondary" onclick="archiveByQuery()">Archive by query</button></div>
           </section>
-          <section class="card"><div class="section-title">Inbox</div><div id="messages" class="message-list"></div></section>
+          <section id="inbox-panel" class="card"><div class="section-title">Inbox</div><div id="messages" class="message-list"></div></section>
+          <section id="repeat-panel" class="card hidden">
+            <div class="section-title">Repeat Senders Across The Mailbox</div>
+            <div id="repeat-summary" class="sender-summary"></div>
+            <div class="spacer"></div>
+            <div id="repeat-senders-main" class="sender-grid"></div>
+          </section>
         </main>
         <aside class="right-col stack">
           <section class="card"><div id="detail" class="detail-card"><div class="section-title">Thread detail</div><div class="small">Tap a message to open it.</div></div></section>
@@ -140,6 +163,351 @@
       </div>
     </div>
     <div id="mobile-detail-overlay" class="mobile-detail-overlay"><div class="mobile-detail-sheet" id="mobile-detail-content"></div></div>
-    <div class="bottom-nav"><div class="nav-inner"><button class="secondary" onclick="document.querySelector('.left-col')?.classList.toggle('show')">Filters</button><button class="secondary" onclick="closeMobileDetail()">Inbox</button><button class="secondary" onclick="openLane('noise')">Noise</button><button class="secondary" onclick="loadAll()">Refresh</button></div></div>
+    <div class="bottom-nav"><div class="nav-inner"><button class="secondary" onclick="document.querySelector('.left-col')?.classList.toggle('show')">Filters</button><button class="secondary" onclick="setView('inbox'); closeMobileDetail()">Inbox</button><button class="secondary" onclick="setView('senders'); closeMobileDetail()">Senders</button><button class="secondary" onclick="openLane('noise')">Noise</button><button class="secondary" onclick="loadAll()">Refresh</button></div></div>
+    <script>
+      window.senderAppState = { currentView: "inbox", repeatSenders: [], messages: [], status: null };
+
+      window.formatMailboxDate = function (value) {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? (value || "") : parsed.toLocaleString();
+      };
+
+      window.senderBadgeClass = function (sender) {
+        if (!sender) return "badge";
+        if (sender.manual_classification === "junk" || sender.sender_category === "junk-suspect") return "badge bad";
+        if ((sender.junk_score || 0) >= 30 || sender.sender_category === "subscription-heavy" || sender.sender_category === "marketing-or-updates") return "badge warn";
+        return "badge good";
+      };
+
+      window.senderBadgeLabel = function (sender) {
+        if (!sender) return "repeat sender";
+        if (sender.manual_classification === "junk") return "junk sender";
+        if (sender.sender_category === "junk-suspect") return "junk suspect";
+        if (sender.sender_category === "subscription-heavy") return "subscription heavy";
+        if (sender.sender_category === "marketing-or-updates") return "marketing or updates";
+        if (sender.sender_category === "priority-repeat") return "priority repeat";
+        return "mixed repeat";
+      };
+
+      window.renderStatus = function (status) {
+        const bits = [];
+        bits.push(status.has_token_file ? "token ready" : "no token");
+        bits.push(status.has_client_secrets ? "client secrets ready" : "no client secrets");
+        bits.push(`${status.messages || 0} stored`);
+        bits.push(`${window.senderAppState.repeatSenders.length || 0} repeat senders`);
+        document.getElementById("status").innerText = bits.join(" | ");
+      };
+
+      window.setBusy = function (label) {
+        document.getElementById("status").innerText = label || "Working...";
+        document.querySelectorAll("button").forEach((button) => {
+          button.disabled = true;
+        });
+      };
+
+      window.clearBusy = function (text) {
+        document.querySelectorAll("button").forEach((button) => {
+          button.disabled = false;
+        });
+        if (text) {
+          document.getElementById("status").innerText = text;
+        } else if (window.senderAppState.status) {
+          window.renderStatus(window.senderAppState.status);
+        }
+      };
+
+      window.setView = function (view) {
+        window.senderAppState.currentView = view;
+        document.getElementById("inbox-controls").classList.toggle("hidden", view !== "inbox");
+        document.getElementById("inbox-panel").classList.toggle("hidden", view !== "inbox");
+        document.getElementById("repeat-panel").classList.toggle("hidden", view !== "senders");
+        document.getElementById("tab-inbox").classList.toggle("active", view === "inbox");
+        document.getElementById("tab-senders").classList.toggle("active", view === "senders");
+      };
+
+      window.renderTopics = function () {
+        const el = document.getElementById("topics");
+        if (!el) return;
+        el.innerHTML = "";
+        [["waiting", "Waiting on others"], ["decision", "Needs decision"], ["reply", "Reply now"], ["noise", "Noise"]].forEach(([key, label]) => {
+          const node = document.createElement("button");
+          node.className = "topic-chip secondary";
+          node.onclick = () => window.openLane(key);
+          node.innerHTML = `<span>${label}</span><span class="badge">${key}</span>`;
+          el.appendChild(node);
+        });
+      };
+
+      window.renderRepeatSidebar = function (rows) {
+        const box = document.getElementById("repeat-senders");
+        const top = rows.slice(0, 6);
+        box.innerHTML = top.map((sender) => `
+          <div class="sender-card">
+            <div class="sender-head">
+              <div>
+                <div class="title">${escapeHtml(sender.sender || "")}</div>
+                <div class="meta">${Number(sender.message_count || 0)} total | ${Number(sender.active_count || 0)} active</div>
+              </div>
+              <span class="${window.senderBadgeClass(sender)}">${escapeHtml(window.senderBadgeLabel(sender))}</span>
+            </div>
+            <div class="toolbar">
+              <button class="secondary" onclick="showSenderFromEncoded('${encodeURIComponent(sender.sender || "")}','true')">View</button>
+              <button class="secondary" onclick="setView('senders')">Open tab</button>
+            </div>
+          </div>
+        `).join("") || '<div class="empty-state">No repeat senders yet.</div>';
+      };
+
+      window.renderMessages = function () {
+        const rows = (window.senderAppState.messages || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+        const container = document.getElementById("messages");
+        container.innerHTML = "";
+        if (!rows.length) {
+          container.innerHTML = '<div class="empty-state">No messages loaded for this view.</div>';
+          return;
+        }
+        rows.forEach((message) => {
+          const shell = document.createElement("div");
+          shell.className = "message-shell";
+          const encodedUnsub = encodeURIComponent(message.unsubscribe_url || "");
+          const bClass = badgeClass(message.actionability_score || 0);
+          shell.innerHTML = `<div class="message-bg">Archive</div><article class="message-card"><div class="message-head"><div><div class="title">${escapeHtml(message.subject || "(no subject)")}</div><div class="meta">${escapeHtml(message.sender || "")} | ${escapeHtml(window.formatMailboxDate(message.date))}</div></div><span class="${bClass}">score ${Number(message.actionability_score || 0)}</span></div><div class="spacer"></div><div class="thread-preview">${escapeHtml(message.summary || message.snippet || "")}</div><div class="spacer"></div><div class="toggle-row"><span class="badge">${escapeHtml(message.intent || "unknown")}</span>${message.unsubscribe_url ? '<span class="badge">unsubscribe seen</span>' : ""}${Number(message.noise_score || 0) >= 2 ? '<span class="badge warn">noise</span>' : ""}${message.cluster_label ? `<span class="badge">${escapeHtml(message.cluster_label)}</span>` : ""}</div><div class="spacer"></div><div class="toolbar"><button class="secondary" onclick="openDetail('${message.id}')">Open</button><button onclick="archiveSelected(['${message.id}'])">Archive</button><button class="secondary" onclick="draftReply('${message.id}')">Draft</button>${message.unsubscribe_url ? `<button class="secondary" onclick="openUnsubscribeFromEncoded('${encodedUnsub}')">Unsubscribe</button>` : ""}</div></article>`;
+          container.appendChild(shell);
+          if (typeof attachSwipe === "function") attachSwipe(shell.querySelector(".message-card"), message.id);
+        });
+      };
+
+      window.renderRepeatSenders = function (rows) {
+        const summary = document.getElementById("repeat-summary");
+        const box = document.getElementById("repeat-senders-main");
+        const totalMessages = rows.reduce((sum, sender) => sum + Number(sender.message_count || 0), 0);
+        const activeMessages = rows.reduce((sum, sender) => sum + Number(sender.active_count || 0), 0);
+        const junkSenders = rows.filter((sender) => sender.manual_classification === "junk" || (sender.junk_score || 0) >= 45).length;
+        const unsubscribeReady = rows.filter((sender) => Number(sender.unsubscribe_link_count || 0) > 0).length;
+        summary.innerHTML = `<div><strong>${rows.length}</strong><span>repeat senders</span></div><div><strong>${totalMessages}</strong><span>stored messages</span></div><div><strong>${activeMessages}</strong><span>still active</span></div><div><strong>${junkSenders}</strong><span>junk weighted</span></div><div><strong>${unsubscribeReady}</strong><span>with unsubscribe links</span></div><div><strong>${rows.filter((sender) => sender.manual_classification === "junk").length}</strong><span>marked junk</span></div><div><strong>${rows.filter((sender) => (sender.junk_score || 0) >= 30).length}</strong><span>high junk score</span></div><div><strong>${rows.filter((sender) => sender.sender_category === "priority-repeat").length}</strong><span>priority repeat</span></div>`;
+        box.innerHTML = rows.map((sender) => {
+          const encodedSender = encodeURIComponent(sender.sender || "");
+          const archiveLimit = Math.max(Number(sender.active_count || 0), 1);
+          const links = (sender.unsubscribe_links || []).map((url, index) => `<a class="chip-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">Unsubscribe ${index + 1}</a>`).join("");
+          const signals = (sender.junk_signals || []).map((signal) => `<span class="badge">${escapeHtml(signal)}</span>`).join("");
+          const subjects = (sender.recent_subjects || []).map((subject) => `<span class="badge">${escapeHtml(subject)}</span>`).join("");
+          return `<div class="sender-card"><div class="sender-head"><div><div class="title">${escapeHtml(sender.sender || "")}</div><div class="meta">${Number(sender.message_count || 0)} total | ${Number(sender.active_count || 0)} active | ${Number(sender.archived_count || 0)} archived | ${Number(sender.thread_count || 0)} threads</div></div><span class="${window.senderBadgeClass(sender)}">${escapeHtml(window.senderBadgeLabel(sender))}</span></div><div class="small">${escapeHtml(sender.sender_reason || "")}</div><div class="sender-summary"><div><strong>${Number(sender.junk_score || 0).toFixed(1)}</strong><span>junk score</span></div><div><strong>${Number(sender.avg_noise_score || 0).toFixed(1)}</strong><span>avg noise</span></div><div><strong>${Number(sender.unsubscribe_link_count || 0)}</strong><span>unsubscribe links</span></div><div><strong>${Number(sender.total_actionability || 0)}</strong><span>actionability</span></div></div><div class="sender-signals">${signals || '<span class="badge">no junk signals yet</span>'}${sender.primary_cluster ? `<span class="badge">${escapeHtml(sender.primary_cluster)}</span>` : ""}${subjects}</div><div class="toolbar"><button class="secondary" onclick="showSenderFromEncoded('${encodedSender}','true')">Show messages</button><button onclick="markSenderJunkFromEncoded('${encodedSender}', ${archiveLimit})">Mark junk and clear</button><button class="secondary" onclick="archiveSenderFromEncoded('${encodedSender}', ${archiveLimit})">Archive active</button></div><div class="sender-links">${links || '<span class="small">No unsubscribe link stored.</span>'}</div></div>`;
+        }).join("") || '<div class="empty-state">No repeat senders yet.</div>';
+      };
+
+      window.renderBriefing = function (payload) {
+        const box = document.getElementById("briefing");
+        const top = payload.top_messages || [];
+        const actions = payload.action_items || [];
+        box.innerHTML = `<div class="briefing"><div class="kpis"><div><div class="num">${top.length}</div><div class="small">Top messages</div></div><div><div class="num">${actions.length}</div><div class="small">Action items</div></div><div><div class="num">${window.senderAppState.messages.length}</div><div class="small">Loaded</div></div></div><div class="spacer"></div><div class="section-title">Briefing</div><div class="stack">${top.slice(0, 5).map((message) => `<div class="small"><strong>${escapeHtml(message.subject || "(no subject)")}</strong><br/>${escapeHtml(message.sender || "")}</div>`).join("") || '<div class="small">No messages yet.</div>'}</div></div>`;
+      };
+
+      window.showSender = async function (sender, includeArchived = false) {
+        try {
+          window.setBusy("Loading sender...");
+          window.setView("inbox");
+          const rows = await api("/api/sender/" + encodeURIComponent(sender) + "?" + new URLSearchParams({ limit: includeArchived ? "200" : "100", include_archived: includeArchived ? "true" : "false" }));
+          window.senderAppState.messages = rows;
+          window.renderMessages();
+          window.clearBusy(`Showing ${rows.length} from ${sender}`);
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.showSenderFromEncoded = function (encodedSender, includeArchived) {
+        return window.showSender(decodeURIComponent(encodedSender), includeArchived === "true");
+      };
+
+      window.archiveSender = async function (sender, limit = 1000) {
+        try {
+          window.setBusy("Archiving sender...");
+          const res = await api("/api/bulk_archive_sender", { method: "POST", body: JSON.stringify({ sender, limit: Number(limit || 1000) }) });
+          window.clearBusy(`Archived ${res.archived} from ${sender}`);
+          await window.loadAll();
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.archiveSenderFromEncoded = function (encodedSender, limit) {
+        return window.archiveSender(decodeURIComponent(encodedSender), limit);
+      };
+
+      window.markSenderJunk = async function (sender, limit = 5000) {
+        try {
+          window.setBusy("Marking sender as junk...");
+          const res = await api("/api/mark_sender_junk", { method: "POST", body: JSON.stringify({ sender, archive_existing: true, limit: Number(limit || 5000) }) });
+          window.clearBusy(`Marked ${res.sender} as junk and archived ${res.archived}`);
+          await window.loadAll();
+          window.setView("senders");
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.markSenderJunkFromEncoded = function (encodedSender, limit) {
+        return window.markSenderJunk(decodeURIComponent(encodedSender), limit);
+      };
+
+      window.openUnsubscribeFromEncoded = function (encodedUrl) {
+        window.open(decodeURIComponent(encodedUrl), "_blank", "noopener");
+      };
+
+      window.login = async function () {
+        try {
+          window.setBusy("Opening Gmail login...");
+          const result = await api("/auth/login");
+          if (result.auth_url) window.location = result.auth_url;
+          else window.clearBusy("Login started");
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.openDetail = async function (id) {
+        try {
+          window.setBusy("Loading message...");
+          const res = await api("/api/message/" + id);
+          const inner = `<div class="sheet-top"><div><div class="section-title">Thread</div><div class="title">${escapeHtml(res.subject || "(no subject)")}</div><div class="meta">${escapeHtml(res.sender || "")}</div></div><button class="secondary" onclick="closeMobileDetail()">Close</button></div><div class="spacer"></div><div class="small"><strong>Summary:</strong> ${escapeHtml(res.summary || "")}</div><div class="small"><strong>Intent:</strong> ${escapeHtml(res.intent || "")}</div><div class="small"><strong>Action:</strong> ${escapeHtml(res.suggested_action || "")}</div>${res.unsubscribe_url ? `<div class="spacer"></div><div class="toolbar"><button onclick="openUnsubscribeFromEncoded('${encodeURIComponent(res.unsubscribe_url)}')">Open unsubscribe</button></div>` : ""}<div class="spacer"></div><div class="section-title">Draft reply</div><div class="small" style="white-space:pre-wrap">${escapeHtml(res.draft_reply || "")}</div><div class="spacer"></div><div class="section-title">Action items</div><div class="stack">${(res.action_items || []).map((item) => `<div class="small">- ${escapeHtml(item.item)}</div>`).join("") || '<div class="small">None</div>'}</div>`;
+          document.getElementById("detail").innerHTML = inner;
+          document.getElementById("mobile-detail-content").innerHTML = inner;
+          if (isMobile()) openMobileDetail();
+          window.clearBusy("Ready");
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.draftReply = async function (id) {
+        try {
+          window.setBusy("Drafting reply...");
+          const tone = prompt("Tone? concise / warm / firm / boundary", "concise") || "concise";
+          const res = await api("/api/draft_reply", { method: "POST", body: JSON.stringify({ message_id: id, tone }) });
+          const html = `<div class="sheet-top"><div><div class="section-title">Draft reply</div></div><button class="secondary" onclick="closeMobileDetail()">Close</button></div><div class="small" style="white-space:pre-wrap">${escapeHtml(res.draft)}</div>`;
+          document.getElementById("detail").innerHTML = html;
+          document.getElementById("mobile-detail-content").innerHTML = html;
+          if (isMobile()) openMobileDetail();
+          window.clearBusy("Ready");
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.searchNow = async function () {
+        try {
+          window.setBusy("Searching...");
+          window.setView("inbox");
+          const q = document.getElementById("search").value;
+          const rows = await api("/api/search?" + new URLSearchParams({ q, k: "20" }));
+          window.senderAppState.messages = rows;
+          window.renderMessages();
+          window.clearBusy(`Showing ${rows.length} results`);
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.archiveSelected = async function (ids) {
+        try {
+          if (!ids?.length) return;
+          window.setBusy(`Archiving ${ids.length}...`);
+          await api("/api/archive", { method: "POST", body: JSON.stringify({ message_ids: ids }) });
+          window.clearBusy(`Archived ${ids.length}`);
+          await window.loadAll();
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.archiveByQuery = async function () {
+        try {
+          window.setBusy("Archiving by query...");
+          const q = document.getElementById("bulkQuery").value;
+          const limit = document.getElementById("bulkLimit").value || "30";
+          const res = await api("/api/bulk_archive_by_query", { method: "POST", body: JSON.stringify({ query: q, limit: Number(limit) }) });
+          window.clearBusy(`Archived ${res.archived}`);
+          await window.loadAll();
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.syncNow = async function () {
+        try {
+          window.setBusy("Syncing Gmail...");
+          const res = await api("/api/sync", { method: "POST", body: JSON.stringify({ max_results: 40, query: "in:anywhere -in:spam -in:trash" }) });
+          window.clearBusy(`Synced ${res.synced} messages`);
+          await window.loadAll();
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.bootstrapNow = async function () {
+        try {
+          window.setBusy("Bootstrapping mailbox...");
+          const res = await api("/api/bootstrap", { method: "POST" });
+          window.clearBusy(`Bootstrapped ${res.synced} messages`);
+          await window.loadAll();
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.openLane = async function (name) {
+        try {
+          window.setBusy(`Loading ${name}...`);
+          window.setView("inbox");
+          const rows = await api(`/api/lane/${name}?limit=200`);
+          window.senderAppState.messages = rows;
+          window.renderMessages();
+          window.clearBusy(`Showing ${rows.length} ${name}`);
+        } catch (e) {
+          window.clearBusy("Ready");
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.loadAll = async function () {
+        try {
+          ui.error("");
+          const [status, messages, briefing, repeats] = await Promise.all([
+            api("/api/status"),
+            api("/api/messages?include_archived=false&limit=200"),
+            api("/api/briefing?limit=10"),
+            api("/api/repeat-senders?include_archived=true&min_count=2&limit=60")
+          ]);
+          window.senderAppState.status = status;
+          window.senderAppState.messages = messages;
+          window.senderAppState.repeatSenders = repeats;
+          window.renderStatus(status);
+          if (typeof renderTopics === "function") renderTopics();
+          window.renderMessages();
+          window.renderBriefing(briefing);
+          window.renderRepeatSidebar(repeats);
+          window.renderRepeatSenders(repeats);
+          window.setView(window.senderAppState.currentView || "inbox");
+        } catch (e) {
+          ui.error(String(e.message || e));
+        }
+      };
+
+      window.addEventListener("DOMContentLoaded", () => {
+        window.setView("inbox");
+        window.loadAll();
+      });
+    </script>
   </body>
 </html>

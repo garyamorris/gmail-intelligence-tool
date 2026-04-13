@@ -42,14 +42,36 @@ def _get_embedder() -> EmbeddingService:
 
 
 def _bootstrap_token_file() -> None:
-    if config.token_path.exists() and config.token_path.stat().st_size > 0:
+    if _has_valid_token_file():
         return
     try:
         token_json = get_secret_version(config.gmail_token_secret)
-        if token_json:
+        if token_json and token_json.strip() not in {"", "{}", "null"}:
             config.token_path.write_text(token_json, encoding="utf-8")
     except Exception:
         pass
+
+
+def _has_valid_client_secrets() -> bool:
+    path = Path(config.client_secrets_file)
+    if not path.exists() or path.stat().st_size == 0:
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return bool(payload.get("installed") or payload.get("web"))
+
+
+def _has_valid_token_file() -> bool:
+    if not config.token_path.exists() or config.token_path.stat().st_size == 0:
+        return False
+    try:
+        payload = json.loads(config.token_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    required = {"refresh_token", "client_id", "client_secret"}
+    return required.issubset(payload)
 
 
 def _sync_messages(max_results: int = 40, query: str = "in:anywhere -in:spam -in:trash") -> int:
@@ -94,7 +116,7 @@ def _sync_messages(max_results: int = 40, query: str = "in:anywhere -in:spam -in
     return len(records)
 
 
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
+templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 
 
 @asynccontextmanager
@@ -126,8 +148,8 @@ def health():
 def status_api():
     return {
         "messages": len(store.list_messages(include_archived=True, limit=1_000_000)),
-        "has_token_file": config.token_path.exists() and config.token_path.stat().st_size > 0,
-        "has_client_secrets": Path(config.client_secrets_file).exists(),
+        "has_token_file": _has_valid_token_file(),
+        "has_client_secrets": _has_valid_client_secrets(),
         "redirect_uri": config.redirect_uri,
         "secret_backed": True,
     }
@@ -144,7 +166,7 @@ def topics_api(limit: int = 50, include_archived: bool = False):
 
 
 @app.get("/api/repeat-senders")
-def repeat_senders_api(min_count: int = 2, limit: int = 25, include_archived: bool = False):
+def repeat_senders_api(min_count: int = 2, limit: int = 25, include_archived: bool = True):
     return store.list_repeat_senders(include_archived=include_archived, min_count=min_count, limit=limit)
 
 
@@ -252,7 +274,7 @@ def bulk_archive_sender(payload: dict):
     sender = payload.get("sender", "")
     if not sender:
         raise HTTPException(status_code=400, detail="sender required")
-    limit = int(payload.get("limit", 100))
+    limit = int(payload.get("limit", 1000))
     rows = store.messages_by_sender(sender=sender, include_archived=False, limit=limit)
     ids = [r["id"] for r in rows]
     if not ids:
@@ -261,6 +283,36 @@ def bulk_archive_sender(payload: dict):
     archived = archive_messages(svc, message_ids=ids)
     store.set_archived(ids, True)
     return {"archived": archived, "sender": sender, "message_ids": ids}
+
+
+@app.post("/api/mark_sender_junk")
+def mark_sender_junk(payload: dict):
+    sender = payload.get("sender", "").strip()
+    if not sender:
+        raise HTTPException(status_code=400, detail="sender required")
+
+    note = payload.get("note", "").strip()
+    archive_existing = bool(payload.get("archive_existing", True))
+    limit = int(payload.get("limit", 5000))
+
+    store.set_sender_classification(sender, "junk", note=note)
+
+    ids: list[str] = []
+    archived = 0
+    if archive_existing:
+        rows = store.messages_by_sender(sender=sender, include_archived=False, limit=limit)
+        ids = [row["id"] for row in rows]
+        if ids:
+            svc = build_gmail_service(str(config.token_path), config.client_secrets_file)
+            archived = archive_messages(svc, message_ids=ids)
+            store.set_archived(ids, True)
+
+    return {
+        "sender": sender,
+        "classification": "junk",
+        "archived": archived,
+        "message_ids": ids,
+    }
 
 
 @app.post("/api/draft_reply")

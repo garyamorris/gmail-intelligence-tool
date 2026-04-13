@@ -91,7 +91,10 @@ def exchange_auth_code(client_secrets_file: str, redirect_uri: str, code: str) -
 def load_credentials(token_path: str, client_secrets_file: str, force_refresh: bool = True) -> Credentials:
     creds = None
     if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        except ValueError:
+            creds = None
 
     if creds and creds.expired and creds.refresh_token and force_refresh:
         creds.refresh(Request())

@@ -8,3 +8,5 @@ credentials/
 .venv/
 .vscode/
 .pytest_cache/
+server.stdout.log
+server.stderr.log

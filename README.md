@@ -22,32 +22,35 @@ You asked for a personal Gmail tool that helps:
 
 ## Quick Start (Local)
 
-```bash
+```powershell
 # from this repo
 python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-cp .env.example .env    # copy and fill values
-mkdir -p credentials
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-Set up Google OAuth creds (`client_secret.json`) from your Google Cloud OAuth consent screen.
+Set `GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT` in `.env` to the project that holds:
 
-```bash
-python scripts/authorize_gmail.py
+- `gmail-client-secrets-json`
+- `gmail-token-json`
+- `gmail-intelligence-gemini-api-key`
+
+For the configured web OAuth client, local auth uses:
+
+- `https://127.0.0.1:8080/auth/callback`
+
+Start the app with local HTTPS:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_local_https.ps1
 ```
 
-This runs a local auth flow and writes `credentials/token.json` for user:
-`gary.a.morris@gmail.com`.
+Then open:
 
-Then:
+- <https://127.0.0.1:8080/>
+- <https://127.0.0.1:8080/auth/start>
 
-```bash
-uvicorn app.main:app --reload --port 8080
-```
-
-Open: <http://localhost:8080>.
+The first visit will use a self-signed local certificate. Accept the browser warning once, then complete Google sign-in. On success the app writes `credentials/token.json`.
 
 ## Environment Variables
 
@@ -59,7 +62,7 @@ Open: <http://localhost:8080>.
 - `GEMINI_API_KEY` (required for embeddings)
 - `EMBEDDING_MODEL` (default: `models/text-embedding-004`)
 - `AGENT_WEBHOOK_URL` (optional, for agent handoff)
-- `REDIRECT_URI` (default: `http://localhost:8080/auth/callback`)
+- `REDIRECT_URI` (default: `https://127.0.0.1:8080/auth/callback`)
 - `DB_PATH` (default: `/app/data/messages.db`)
 - `CORS_ORIGINS` (default: `*`)
 
